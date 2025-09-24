@@ -1,22 +1,10 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { MongoClient, ObjectId } from 'mongodb'
+import { ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
+import { connectDB } from './database'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key'
-const MONGODB_URI = process.env.DATABASE_URL || 'mongodb+srv://shared-user-storyforge:9ymFqwzqvSpyG4HH@cluster0.f2gdjg2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'
-
-let client: MongoClient
-let db: any
-
-async function connectDB() {
-  if (!client) {
-    client = new MongoClient(MONGODB_URI)
-    await client.connect()
-    db = client.db('storyforge')
-  }
-  return db
-}
 
 export interface User {
   id: string
