@@ -1,9 +1,22 @@
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import { prisma } from './prisma'
+import { MongoClient, ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key'
+const MONGODB_URI = process.env.DATABASE_URL || 'mongodb+srv://shared-user-storyforge:9ymFqwzqvSpyG4HH@cluster0.f2gdjg2.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0'
+
+let client: MongoClient
+let db: any
+
+async function connectDB() {
+  if (!client) {
+    client = new MongoClient(MONGODB_URI)
+    await client.connect()
+    db = client.db('storyforge')
+  }
+  return db
+}
 
 export interface User {
   id: string
@@ -19,14 +32,15 @@ export interface AuthResult {
 
 export async function register(username: string, email: string, password: string, newsletter: boolean = false): Promise<AuthResult> {
   try {
+    const database = await connectDB()
+    const users = database.collection('users')
+
     // Check if user already exists by email or username
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [
-          { email },
-          { username }
-        ]
-      }
+    const existingUser = await users.findOne({
+      $or: [
+        { email },
+        { username }
+      ]
     })
 
     if (existingUser) {
@@ -42,21 +56,22 @@ export async function register(username: string, email: string, password: string
     const hashedPassword = await bcrypt.hash(password, 12)
 
     // Create user
-    const user = await prisma.user.create({
-      data: {
-        username,
-        email,
-        password: hashedPassword,
-        newsletter
-      }
+    const result = await users.insertOne({
+      username,
+      email,
+      password: hashedPassword,
+      newsletter,
+      emailVerified: false,
+      createdAt: new Date(),
+      updatedAt: new Date()
     })
 
     return {
       ok: true,
       user: {
-        id: user.id,
-        username: user.username,
-        email: user.email
+        id: result.insertedId.toString(),
+        username,
+        email
       }
     }
   } catch (error) {
@@ -67,10 +82,11 @@ export async function register(username: string, email: string, password: string
 
 export async function login(email: string, password: string): Promise<AuthResult> {
   try {
+    const database = await connectDB()
+    const users = database.collection('users')
+
     // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email }
-    })
+    const user = await users.findOne({ email })
 
     if (!user) {
       return { ok: false, error: 'Invalid credentials' }
@@ -86,7 +102,7 @@ export async function login(email: string, password: string): Promise<AuthResult
     return {
       ok: true,
       user: {
-        id: user.id,
+        id: user._id.toString(),
         username: user.username,
         email: user.email
       }
@@ -127,16 +143,23 @@ export async function getCurrentUser(): Promise<User | null> {
       return null
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: payload.userId },
-      select: {
-        id: true,
-        username: true,
-        email: true
-      }
-    })
+    const database = await connectDB()
+    const users = database.collection('users')
+    
+    const user = await users.findOne(
+      { _id: new ObjectId(payload.userId) },
+      { projection: { _id: 1, username: 1, email: 1 } }
+    )
 
-    return user
+    if (!user) {
+      return null
+    }
+
+    return {
+      id: user._id.toString(),
+      username: user.username,
+      email: user.email
+    }
   } catch (error) {
     console.error('Get current user error:', error)
     return null
