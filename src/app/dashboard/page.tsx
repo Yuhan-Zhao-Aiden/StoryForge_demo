@@ -1,8 +1,16 @@
 // app/(dashboard)/page.tsx
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+
+// Icons
+import { FaBook } from "react-icons/fa";
+import { VscVmActive } from "react-icons/vsc";
+import { FaUserGroup } from "react-icons/fa6";
+import { FaChartLine } from "react-icons/fa6";
+
+import StatCard from "@/components/dashboard/StatCard";
+import StoryRow from "@/components/dashboard/StoryRow";
 
 async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, credentials: "include", cache: "no-store" });
@@ -77,61 +85,9 @@ const collabStories: Story[] = [
   },
 ];
 
-// ---- Small presentational pieces ----
-function StatCard({
-  label,
-  value,
-  icon,
-}: {
-  label: string;
-  value: string | number;
-  icon?: React.ReactNode;
-}) {
-  return (
-    <Card className="border-muted/60">
-      <CardHeader className="pb-2">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-muted-foreground">{label}</span>
-          {icon ? <span className="text-muted-foreground">{icon}</span> : null}
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0">
-        <div className="text-3xl font-semibold tracking-tight">{value}</div>
-      </CardContent>
-    </Card>
-  );
-}
 
-function StoryRow({ s }: { s: Story }) {
-  return (
-    <li className="flex items-start justify-between rounded-lg border border-muted/60 bg-background p-3 hover:bg-muted/30">
-      <div className="pr-3">
-        <div className="flex items-center gap-2">
-          <div className="font-medium leading-tight">{s.title}</div>
-          {s.status ? (
-            <Badge variant="secondary" className="h-5 px-2 text-[11px]">
-              {s.status}
-            </Badge>
-          ) : null}
-        </div>
-        {s.subtitle ? (
-          <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{s.subtitle}</p>
-        ) : null}
-        <p className="mt-1 text-xs text-muted-foreground">
-          Last edited: {s.lastEdited} • {s.collaborators} collaborator{s.collaborators === 1 ? "" : "s"}
-        </p>
-      </div>
-      {/* Kebab menu placeholder (non-functional) */}
-      <button
-        type="button"
-        className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-        aria-label="More"
-      >
-        •••
-      </button>
-    </li>
-  );
-}
+
+
 
 export default function DashboardPage() {
   const totalStories = ownedStories.length + collabStories.length;
@@ -139,7 +95,7 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-6xl px-6 py-6">
       {/* Top bar (title + actions) */}
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-16 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold leading-tight">Welcome back, {currentUser.name}</h1>
           <p className="text-sm text-muted-foreground">
@@ -152,13 +108,16 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats row (only keep Total Stories per your request) */}
+      {/* Stats row (only keep Total Stories ) */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Stories" value={totalStories} />
+        <StatCard label="Total Stories" value={totalStories} icon={<FaBook />}/>
+        <StatCard label="Active Sessions" value={totalStories} icon={<VscVmActive />}/>
+        <StatCard label="Collaborators" value={10} icon={< FaUserGroup />}/>
+        <StatCard label="This month" value={24} icon={<FaChartLine />}/>
         {/* Empty placeholders to visually balance the row like the mock */}
+        {/* <div className="hidden lg:block" />
         <div className="hidden lg:block" />
-        <div className="hidden lg:block" />
-        <div className="hidden lg:block" />
+        <div className="hidden lg:block" /> */}
       </div>
 
       {/* Recent Stories split into Owned & Collaborating */}
@@ -166,7 +125,7 @@ export default function DashboardPage() {
         {/* Owned takes 2/3 width like the mock’s left pane */}
         <Card className="lg:col-span-2 border-muted/60">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base">Recent Stories — Owned</CardTitle>
+            <CardTitle className="text-base">Recent Stories — Your Stories</CardTitle>
             <Link
               href="#"
               className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
