@@ -6,90 +6,137 @@ import { Button } from "@/components/ui/button";
 // Icons
 import { FaBook } from "react-icons/fa";
 import { VscVmActive } from "react-icons/vsc";
-import { FaUserGroup } from "react-icons/fa6";
-import { FaChartLine } from "react-icons/fa6";
+import { FaUserGroup, FaChartLine } from "react-icons/fa6";
 
 import StatCard from "@/components/dashboard/StatCard";
 import StoryRow from "@/components/dashboard/StoryRow";
 
-async function fetchJSON<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, { ...init, credentials: "include", cache: "no-store" });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-}
+// server-side deps
+import { getCurrentUser } from "@/lib/auth";
+import { getDb } from "@/lib/mongodb";
+import { ObjectId } from "mongodb";
 
-type Room = { _id: string; title: string; visibility?: "private" | "unlisted" | "public"; updatedAt?: string };
-// type RoomsPayload = { owned: Room[]; collaborating: { room: Room; role: string }[] };
-
-// const { user } = await fetchJSON<{ user: { username?: string | null; email: string } }>("/api/me");
-// const { owned, collaborating } = await fetchJSON<RoomsPayload>("/api/me/rooms");
-
-// ---- Mock data (replace later with API/me + API/me/rooms) ----
-const currentUser = {
-  name: "Sarah",
-  email: "sarah@example.com",
-};
-
+// Types (keep Story consistent with StoryRow) 
 type Story = {
   _id: string;
   title: string;
   subtitle?: string;
   status?: "Active" | "Draft" | "Published";
-  lastEdited: string; // e.g., "Jan 12, 2025"
+  lastEdited: string;
   collaborators: number;
 };
 
-const ownedStories: Story[] = [
-  {
-    _id: "r1",
-    title: "The Lighthouse Mystery",
-    subtitle: "A dark tale of secrets hidden in an old lighthouse…",
-    status: "Active",
-    lastEdited: "Jan 15, 2025",
-    collaborators: 4,
-  },
-  {
-    _id: "r2",
-    title: "Space Station Alpha",
-    subtitle: "Sci-fi adventure aboard a distant space station…",
-    status: "Draft",
-    lastEdited: "Jan 12, 2025",
-    collaborators: 2,
-  },
-  {
-    _id: "r3",
-    title: "Medieval Quest",
-    subtitle: "Fantasy adventure in a medieval kingdom…",
-    status: "Published",
-    lastEdited: "Jan 10, 2025",
-    collaborators: 6,
-  },
-];
+// DB room doc (minimal fields we use)
+type RoomDoc = {
+  _id: ObjectId;
+  title: string;
+  subtitle?: string | null;
+  collaborators?: number | null;
+  visibility?: "private" | "unlisted" | "public";
+  updatedAt?: Date;
+};
 
-const collabStories: Story[] = [
-  {
-    _id: "c1",
-    title: "Neon City Blues",
-    subtitle: "Cyber-noir mystery under neon skies…",
-    status: "Active",
-    lastEdited: "Jan 14, 2025",
-    collaborators: 5,
-  },
-  {
-    _id: "c2",
-    title: "Desert of Glass",
-    subtitle: "Post-apocalyptic trek across a shattered land…",
-    status: "Draft",
-    lastEdited: "Jan 11, 2025",
-    collaborators: 3,
-  },
-];
+// Helpers 
+function formatDateISO(d?: Date) {
+  if (!d) return "—";
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
 
+function roomToStory(r: RoomDoc): Story {
+  const status: Story["status"] =
+    r.visibility === "public" ? "Published" :
+    r.visibility === "unlisted" ? "Draft" : "Active";
 
+  return {
+    _id: String(r._id),
+    title: r.title,
+    subtitle: r.subtitle ?? undefined,
+    status,
+    lastEdited: formatDateISO(r.updatedAt),
+    collaborators: r.collaborators ?? 0,
+  };
+}
 
+// Data loader (server) 
+async function loadData() {
+  const me = await getCurrentUser();
+  if (!me) throw new Error("Unauthorized");
 
+  const db = await getDb();
 
-export default function DashboardPage() {
+  // Resolve userId (prefer id from token; fallback by email)
+  let userId: ObjectId | null = null;
+  if (me.id && ObjectId.isValid(me.id)) userId = new ObjectId(me.id);
+  if (!userId && me.email) {
+    const u = await db.collection("users").findOne<{ _id: ObjectId }>({ email: me.email }, { projection: { _id: 1 } });
+    if (u?._id) userId = u._id;
+  }
+  if (!userId) throw new Error("User not found");
+
+  // Owned rooms
+  const ownedRooms: RoomDoc[] = await db
+    .collection<RoomDoc>("rooms")
+    .find({ ownerId: userId })
+    .project({ title: 1, subtitle: 1, collaborators: 1, visibility: 1, updatedAt: 1 })
+    .sort({ updatedAt: -1 })
+    .toArray() as RoomDoc[];
+
+  // Collaborations (exclude owner)
+  const memberships = await db
+    .collection("roomMembers")
+    .find({ userId, role: { $ne: "owner" } })
+    .project({ roomId: 1, role: 1 })
+    .toArray();
+
+  const collabIds = memberships.map((m: any) => m.roomId as ObjectId);
+  let collabRooms: RoomDoc[] = [];
+  if (collabIds.length) {
+    collabRooms = await db
+      .collection<RoomDoc>("rooms")
+      .find({ _id: { $in: collabIds } })
+      .project({ title: 1, subtitle: 1, collaborators: 1, visibility: 1, updatedAt: 1 })
+      .toArray() as RoomDoc[];
+  }
+
+  // Build collaborating list aligned to memberships order
+  const collabMap = new Map<string, RoomDoc>();
+  collabRooms.forEach((r) => collabMap.set(String(r._id), r));
+  const collaboratingRooms: RoomDoc[] = memberships
+    .map((m: any) => collabMap.get(String(m.roomId)))
+    .filter((r): r is RoomDoc => !!r);
+
+  // If any room is missing `collaborators`, compute from roomMembers (count - 1 owner)
+  const missingIds = [
+    ...ownedRooms.filter((r) => r.collaborators == null).map((r) => r._id),
+    ...collaboratingRooms.filter((r) => r.collaborators == null).map((r) => r._id),
+  ];
+  if (missingIds.length) {
+    const counts = await db
+      .collection("roomMembers")
+      .aggregate<{ _id: ObjectId; count: number }>([
+        { $match: { roomId: { $in: missingIds } } },
+        { $group: { _id: "$roomId", count: { $sum: 1 } } },
+      ])
+      .toArray();
+    const countMap = new Map<string, number>(counts.map((c) => [String(c._id), Math.max(0, c.count - 1)]));
+    ownedRooms.forEach((r) => { if (r.collaborators == null) r.collaborators = countMap.get(String(r._id)) ?? 0; });
+    collaboratingRooms.forEach((r) => { if (r.collaborators == null) r.collaborators = countMap.get(String(r._id)) ?? 0; });
+  }
+
+  // Normalize to Story[]
+  const ownedStories: Story[] = ownedRooms.map(roomToStory);
+  const collabStories: Story[] = collaboratingRooms.map(roomToStory);
+
+  return {
+    user: { username: (me as any).username ?? null, email: me.email },
+    ownedStories,
+    collabStories,
+  };
+}
+
+// Page (server component) 
+export default async function DashboardPage() {
+  const { user, ownedStories, collabStories } = await loadData();
   const totalStories = ownedStories.length + collabStories.length;
 
   return (
@@ -97,7 +144,9 @@ export default function DashboardPage() {
       {/* Top bar (title + actions) */}
       <div className="mb-16 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold leading-tight">Welcome back, {currentUser.name}</h1>
+          <h1 className="text-xl font-semibold leading-tight">
+            Welcome back, {user.username ?? user.email}
+          </h1>
           <p className="text-sm text-muted-foreground">
             Manage your stories and join collaborative sessions
           </p>
@@ -108,21 +157,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats row (only keep Total Stories ) */}
+      {/* Stats row */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Stories" value={totalStories} icon={<FaBook />}/>
-        <StatCard label="Active Sessions" value={totalStories} icon={<VscVmActive />}/>
-        <StatCard label="Collaborators" value={10} icon={< FaUserGroup />}/>
-        <StatCard label="This month" value={24} icon={<FaChartLine />}/>
-        {/* Empty placeholders to visually balance the row like the mock */}
-        {/* <div className="hidden lg:block" />
-        <div className="hidden lg:block" />
-        <div className="hidden lg:block" /> */}
+        <StatCard label="Total Stories" value={totalStories} icon={<FaBook />} />
+        <StatCard label="Active Sessions" value={totalStories} icon={<VscVmActive />} />
+        <StatCard label="Collaborators" value={10} icon={<FaUserGroup />} />
+        <StatCard label="This month" value={24} icon={<FaChartLine />} />
       </div>
 
       {/* Recent Stories split into Owned & Collaborating */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        {/* Owned takes 2/3 width like the mock’s left pane */}
+        {/* Owned (2/3 width) */}
         <Card className="lg:col-span-2 border-muted/60">
           <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base">Recent Stories — Your Stories</CardTitle>
@@ -146,7 +191,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Right pane: Collaborating */}
+        {/* Collaborating */}
         <Card className="border-muted/60">
           <CardHeader>
             <CardTitle className="text-base">Recent Stories — Collaborating</CardTitle>

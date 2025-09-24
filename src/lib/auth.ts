@@ -119,7 +119,7 @@ export function verifyToken(token: string): { userId: string; email: string } | 
 
 export async function getCurrentUser(): Promise<User | null> {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const token = cookieStore.get('auth-token')?.value
 
     if (!token) {

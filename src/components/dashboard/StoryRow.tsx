@@ -5,9 +5,10 @@ type Story = {
   title: string;
   subtitle?: string;
   status?: "Active" | "Draft" | "Published";
-  lastEdited: string; // e.g., "Jan 12, 2025"
+  lastEdited: string;
   collaborators: number;
 };
+
 
 function StoryRow({ s }: { s: Story }) {
   return (

@@ -5,7 +5,7 @@ declare global {
 }
 
 const uri = process.env.MONGODB_URI!;
-const dbName = process.env.MONGODB_DB || "appdb_dev";
+const dbName = process.env.MONGODB_DB || "storyforge";
 
 if (!uri) {
   throw new Error("MONGODB_URI is not defined in .env");
