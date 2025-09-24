@@ -3,11 +3,14 @@ import { register, createToken } from '@/lib/auth'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Registration API called')
     const body = await request.json()
+    console.log('Request body:', body)
     const { username, email, password, newsletter } = body
 
     // Validate required fields
     if (!username || !email || !password) {
+      console.log('Missing required fields:', { username, email, password })
       return NextResponse.json(
         { ok: false, error: 'Username, email, and password are required' },
         { status: 400 }

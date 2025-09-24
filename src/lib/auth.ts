@@ -20,7 +20,9 @@ export interface AuthResult {
 
 export async function register(username: string, email: string, password: string, newsletter: boolean = false): Promise<AuthResult> {
   try {
+    console.log('Register function called with:', { username, email, newsletter })
     const database = await connectDB()
+    console.log('Database connected successfully')
     const users = database.collection('users')
 
     // Check if user already exists by email or username
@@ -119,7 +121,7 @@ export function verifyToken(token: string): { userId: string; email: string } | 
 
 export async function getCurrentUser(): Promise<User | null> {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const token = cookieStore.get('auth-token')?.value
 
     if (!token) {
