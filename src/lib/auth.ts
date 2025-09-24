@@ -72,20 +72,27 @@ export async function register(username: string, email: string, password: string
 
 export async function login(email: string, password: string): Promise<AuthResult> {
   try {
+    console.log('Login function called with:', { email })
     const database = await connectDB()
+    console.log('Database connected successfully for login')
     const users = database.collection('users')
 
     // Find user by email
     const user = await users.findOne({ email })
+    console.log('User found:', user ? 'Yes' : 'No')
 
     if (!user) {
+      console.log('User not found in database')
       return { ok: false, error: 'Invalid credentials' }
     }
 
     // Verify password
+    console.log('Verifying password...')
     const isValidPassword = await bcrypt.compare(password, user.password)
+    console.log('Password valid:', isValidPassword)
 
     if (!isValidPassword) {
+      console.log('Password verification failed')
       return { ok: false, error: 'Invalid credentials' }
     }
 
