@@ -150,6 +150,44 @@ flag
 
 ------------------------------------------------------------------------
 
+
+- **Collection**: `roomInvites`
+- **Purpose**: Store hashed invite codes for joining rooms without altering `rooms`.
+
+### Required fields
+- `roomId` (ObjectId) – FK to `rooms._id`
+- `codeHash` (string) – SHA-256 / bcrypt / argon2 hash of the invite code
+- `role` ("editor" | "viewer") – default role granted on redeem
+- `uses` (int/long ≥ 0) – current usage count
+- `createdBy` (ObjectId) – user who generated the invite
+- `createdAt` (date)
+
+### Optional fields
+- `maxUses` (int/long | null) – null = unlimited
+- `expiresAt` (date | null) – TTL target
+- `disabled` (bool) – force revoke immediately
+
+### Indexes
+- Unique: `{ codeHash: 1 }`
+- Secondary: `{ roomId: 1, createdAt: -1 }`
+- TTL (optional): `{ expiresAt: 1 }` with `expireAfterSeconds: 0`
+
+### Example document
+```json
+{
+  "_id": { "$oid": "650000000000000000000abc" },
+  "roomId": { "$oid": "68d43893344d65a6ff50d650" },
+  "codeHash": "d0/…==",
+  "role": "viewer",
+  "maxUses": null,
+  "uses": 0,
+  "expiresAt": null,
+  "createdBy": { "$oid": "68d417bd344d65a6ff50d64f" },
+  "createdAt": { "$date": "2025-09-24T16:20:00Z" },
+  "disabled": false
+}
+```
+
 ## Summary
 
 -   **Users**: account management

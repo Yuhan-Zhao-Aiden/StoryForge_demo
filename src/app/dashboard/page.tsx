@@ -16,6 +16,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 import { NewStoryDialog } from "./_components/NewStoryDialog";
+import { RedeemInvite } from "./_components/RedeemInvite";
 
 // Types (keep Story consistent with StoryRow) 
 type Story = {
@@ -153,8 +154,9 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="secondary">Join Session</Button>
+          {/* <Button variant="secondary">Join Session</Button> */}
           {/* <Button>+ Create New Story</Button> */}
+          <RedeemInvite trigger={<Button variant="secondary">Join Session</Button>} />
           <NewStoryDialog />
         </div>
       </div>
@@ -186,7 +188,7 @@ export default async function DashboardPage() {
             ) : (
               <ul className="space-y-3">
                 {ownedStories.map((s) => (
-                  <StoryRow key={s._id} s={s} />
+                  <StoryRow key={s._id} s={s} invitable={true}/>
                 ))}
               </ul>
             )}
@@ -204,7 +206,7 @@ export default async function DashboardPage() {
             ) : (
               <ul className="space-y-3">
                 {collabStories.map((s) => (
-                  <StoryRow key={s._id} s={s} />
+                  <StoryRow key={s._id} s={s} invitable={false}/>
                 ))}
               </ul>
             )}

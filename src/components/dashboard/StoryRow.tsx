@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { GenerateInvite } from "./GenerateInvite";
 
 type Story = {
   _id: string;
@@ -9,8 +10,16 @@ type Story = {
   collaborators: number;
 };
 
+const sideButton =       
+  <button
+    type="button"
+    className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+    aria-label="More"
+  >
+    •••
+  </button>
 
-function StoryRow({ s }: { s: Story }) {
+function StoryRow({ s, invitable }: { s: Story, invitable: boolean }) {
   return (
     <li className="flex items-start justify-between rounded-lg border border-muted/60 bg-background p-3 hover:bg-muted/30">
       <div className="pr-3">
@@ -30,13 +39,10 @@ function StoryRow({ s }: { s: Story }) {
         </p>
       </div>
       {/* Kebab menu placeholder (non-functional) */}
-      <button
-        type="button"
-        className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-        aria-label="More"
-      >
-        •••
-      </button>
+      {
+        invitable ? <GenerateInvite roomId={s._id} trigger={sideButton}/>
+        : sideButton
+      }
     </li>
   );
 }
