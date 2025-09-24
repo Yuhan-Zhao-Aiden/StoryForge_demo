@@ -15,6 +15,7 @@ import StoryRow from "@/components/dashboard/StoryRow";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import { NewStoryDialog } from "./_components/NewStoryDialog";
 
 // Types (keep Story consistent with StoryRow) 
 type Story = {
@@ -153,7 +154,8 @@ export default async function DashboardPage() {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="secondary">Join Session</Button>
-          <Button>+ Create New Story</Button>
+          {/* <Button>+ Create New Story</Button> */}
+          <NewStoryDialog />
         </div>
       </div>
 
