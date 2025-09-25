@@ -5,7 +5,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 
 import { registerSchema, type RegisterFormData } from '@/lib/validations'
 
@@ -63,7 +63,7 @@ export default function RegisterForm() {
     setPasswordStrength({ score, text: feedback })
   }
 
-  const onSubmit = async (data: RegisterFormData) => {
+  const handleRegister = async (formData: RegisterFormData) => {
     setIsLoading(true)
     setError('')
     setSuccess('')
@@ -74,7 +74,7 @@ export default function RegisterForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formData),
       })
 
       const result = await response.json()
@@ -96,7 +96,7 @@ export default function RegisterForm() {
           setFocus('password')
         }
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.')
     } finally {
       setIsLoading(false)
@@ -151,7 +151,7 @@ export default function RegisterForm() {
         )}
 
         {/* Signup form */}
-        <form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
+        <form className="auth-form" onSubmit={handleSubmit(handleRegister)}>
           <div className="form-group">
             <label className="form-label" htmlFor="username">
               Username <span className="required">*</span>
@@ -268,7 +268,7 @@ export default function RegisterForm() {
                 {...register('terms')}
               />
               <label htmlFor="terms" className="checkbox-label">
-                I agree to StoryForge's <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a> <span className="required">*</span>
+                I agree to StoryForge&apos;s <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a> <span className="required">*</span>
               </label>
             </div>
             {errors.terms && (
@@ -285,7 +285,7 @@ export default function RegisterForm() {
                 {...register('newsletter')}
               />
               <label htmlFor="newsletter" className="checkbox-label">
-                I'd like to receive updates about new features and storytelling tips (optional)
+                I&apos;d like to receive updates about new features and storytelling tips (optional)
               </label>
             </div>
           </div>

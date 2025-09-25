@@ -53,3 +53,4 @@ export const passwordSchema = z.object({
 export type PasswordFormData = z.infer<typeof passwordSchema>
 export type LoginFormData = z.infer<typeof loginSchema>
 export type RegisterFormData = z.infer<typeof registerSchema>
+

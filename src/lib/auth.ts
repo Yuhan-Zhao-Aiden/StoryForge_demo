@@ -20,10 +20,10 @@ export interface AuthResult {
 
 export async function register(username: string, email: string, password: string, newsletter: boolean = false): Promise<AuthResult> {
   try {
-    const database = await connectDB()
-    const users = database.collection('users')
+    const db = await connectDB()
+    const users = db.collection('users')
 
-    // Check if user already exists by email or username
+    // Check if user already exists
     const existingUser = await users.findOne({
       $or: [
         { email },
@@ -40,14 +40,14 @@ export async function register(username: string, email: string, password: string
       }
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12)
+    // Hash the password
+    const passwordHash = await bcrypt.hash(password, 12)
 
-    // Create user
+    // Create new user
     const result = await users.insertOne({
       username,
       email,
-      password: hashedPassword,
+      password: passwordHash,
       newsletter,
       emailVerified: false,
       createdAt: new Date(),
@@ -70,8 +70,8 @@ export async function register(username: string, email: string, password: string
 
 export async function login(email: string, password: string): Promise<AuthResult> {
   try {
-    const database = await connectDB()
-    const users = database.collection('users')
+    const db = await connectDB()
+    const users = db.collection('users')
 
     // Find user by email
     const user = await users.findOne({ email })
@@ -80,7 +80,7 @@ export async function login(email: string, password: string): Promise<AuthResult
       return { ok: false, error: 'Invalid credentials' }
     }
 
-    // Verify password
+    // Check password
     const isValidPassword = await bcrypt.compare(password, user.password)
 
     if (!isValidPassword) {
@@ -137,9 +137,9 @@ export async function getCurrentUser(): Promise<User | null> {
       return null
     }
 
-    const database = await connectDB()
-    const users = database.collection('users')
-    
+    const db = await connectDB()
+    const users = db.collection('users')
+
     const user = await users.findOne(
       { _id: new ObjectId(payload.userId) },
       { projection: { _id: 1, username: 1, email: 1 } }

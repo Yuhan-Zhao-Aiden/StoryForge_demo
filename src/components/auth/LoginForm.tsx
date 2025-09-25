@@ -25,7 +25,7 @@ export default function LoginForm() {
     resolver: zodResolver(loginSchema)
   })
 
-  const onSubmit = async (data: LoginFormData) => {
+  const handleLogin = async (formData: LoginFormData) => {
     setIsLoading(true)
     setError('')
     setSuccess('')
@@ -36,15 +36,15 @@ export default function LoginForm() {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(formData),
       })
 
       const result = await response.json()
 
       if (result.ok) {
-        setSuccess('Welcome back! Redirecting to your dashboard...')
+        setSuccess('Welcome back! Redirecting to your home...')
         setTimeout(() => {
-          router.push('/dashboard')
+          router.push('/')
         }, 2000)
       } else {
         setError(result.error || 'Invalid credentials. Please try again.')
@@ -55,7 +55,7 @@ export default function LoginForm() {
           setFocus('password')
         }
       }
-    } catch (err) {
+    } catch {
       setError('Network error. Please try again.')
     } finally {
       setIsLoading(false)
@@ -102,7 +102,7 @@ export default function LoginForm() {
         )}
 
         {/* Login form */}
-        <form className="auth-form" onSubmit={handleSubmit(onSubmit)}>
+        <form className="auth-form" onSubmit={handleSubmit(handleLogin)}>
           <div className="form-group">
             <label className="form-label" htmlFor="email">
               Email Address
