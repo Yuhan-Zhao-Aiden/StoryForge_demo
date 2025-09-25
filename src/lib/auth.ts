@@ -80,6 +80,14 @@ export async function login(email: string, password: string): Promise<AuthResult
     // Find user by email
     const user = await users.findOne({ email })
     console.log('User found:', user ? 'Yes' : 'No')
+    if (user) {
+      console.log('User data:', { 
+        id: user._id, 
+        username: user.username, 
+        email: user.email,
+        passwordHash: user.password?.substring(0, 20) + '...' // Show first 20 chars of hash
+      })
+    }
 
     if (!user) {
       console.log('User not found in database')
@@ -88,6 +96,8 @@ export async function login(email: string, password: string): Promise<AuthResult
 
     // Verify password
     console.log('Verifying password...')
+    console.log('Entered password:', password)
+    console.log('Stored hash length:', user.password?.length)
     const isValidPassword = await bcrypt.compare(password, user.password)
     console.log('Password valid:', isValidPassword)
 

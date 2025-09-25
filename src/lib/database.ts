@@ -25,3 +25,4 @@ export async function closeDB(): Promise<void> {
     db = null as any
   }
 }
+

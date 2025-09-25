@@ -42,9 +42,9 @@ export default function LoginForm() {
       const result = await response.json()
 
       if (result.ok) {
-        setSuccess('Welcome back! Redirecting to your dashboard...')
+        setSuccess('Welcome back! Redirecting to your home...')
         setTimeout(() => {
-          router.push('/dashboard')
+          router.push('/')
         }, 2000)
       } else {
         setError(result.error || 'Invalid credentials. Please try again.')
