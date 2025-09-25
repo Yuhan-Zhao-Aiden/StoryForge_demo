@@ -117,6 +117,12 @@ export function verifyToken(token: string): { userId: string; email: string } | 
   }
 }
 
+export async function hashPassword(password: string): Promise<string> {
+  const saltRounds = 10
+  const hashed = await bcrypt.hash(password, saltRounds)
+  return hashed
+}
+
 export async function getCurrentUser(): Promise<User | null> {
   try {
     const cookieStore = cookies()
