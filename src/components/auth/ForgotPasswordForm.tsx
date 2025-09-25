@@ -166,7 +166,7 @@ export default function ForgotPasswordForm() {
                 >
                   {idx + 1}
                 </div>
-                <div className="text-xs mt-1">{label}</div>
+                <div className="text-xs mt-1 text-gray-800">{label}</div>
                 {idx < stepLabels.length - 1 && (
                   <div
                     className={`absolute top-3 left-1/2 w-full h-1 transition-colors duration-300 ${
@@ -191,7 +191,7 @@ export default function ForgotPasswordForm() {
               type="email"
               {...registerEmail('email')}
               placeholder="Email address"
-              className={`w-full p-3 border rounded-lg ${emailErrors.email ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full p-3 border rounded-lg text-gray-800 ${emailErrors.email ? 'border-red-500' : 'border-gray-300'}`}
             />
             {emailErrors.email && <div className="text-red-500 text-sm">{emailErrors.email.message}</div>}
             <button
@@ -211,7 +211,7 @@ export default function ForgotPasswordForm() {
               type="text"
               {...registerCode('code')}
               placeholder="6-digit code"
-              className={`w-full p-3 border rounded-lg ${codeErrors.code || asyncError ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full p-3 border rounded-lg text-gray-800 ${codeErrors.code || asyncError ? 'border-red-500' : 'border-gray-300'}`}
             />
             {codeErrors.code && <div className="text-red-500 text-sm">{codeErrors.code.message}</div>}
             <button
@@ -232,7 +232,7 @@ export default function ForgotPasswordForm() {
                 type={showPassword ? 'text' : 'password'}
                 {...register('password')}
                 placeholder="New password"
-                className={`w-full p-3 border rounded-lg ${passwordErrors.password ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full p-3 border rounded-lg text-gray-800 ${passwordErrors.password ? 'border-red-500' : 'border-gray-300'}`}
               />
               <button type="button" className="absolute right-3 top-3" onClick={() => togglePassword('password')}>
                 {showPassword ? '🙈' : '👁️'}
@@ -264,7 +264,7 @@ export default function ForgotPasswordForm() {
                 type={showConfirmPassword ? 'text' : 'password'}
                 {...register('confirmPassword')}
                 placeholder="Confirm password"
-                className={`w-full p-3 border rounded-lg ${passwordErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full p-3 border rounded-lg text-gray-800 ${passwordErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'}`}
               />
               <button type="button" className="absolute right-3 top-3" onClick={() => togglePassword('confirmPassword')}>
                 {showConfirmPassword ? '🙈' : '👁️'}
