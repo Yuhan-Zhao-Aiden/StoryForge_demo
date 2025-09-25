@@ -23,7 +23,7 @@ export default function Home() {
       setCurrentStory((prev) => (prev + 1) % stories.length)
     }, 3000)
     return () => clearInterval(interval)
-  }, [])
+  }, [stories.length])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 to-pink-900 relative overflow-hidden">
@@ -153,9 +153,9 @@ export default function Home() {
           <div className="mt-24 bg-gradient-to-r from-black/40 to-black/20 backdrop-blur-sm border border-white/20 rounded-3xl p-12 max-w-5xl mx-auto">
             <h2 className="text-4xl font-bold text-white mb-8 text-center">Your Story Awaits</h2>
             <div className="text-xl text-gray-200 text-center leading-relaxed italic">
-              "In the realm of StoryForge, every word is a spell, every sentence a journey, and every story a universe waiting to be discovered. 
+              &ldquo;In the realm of StoryForge, every word is a spell, every sentence a journey, and every story a universe waiting to be discovered. 
               <br /><br />
-              <span className="text-yellow-300 font-semibold">What tale will you tell today?</span>"
+              <span className="text-yellow-300 font-semibold">What tale will you tell today?&rdquo;</span>
             </div>
           </div>
         </div>

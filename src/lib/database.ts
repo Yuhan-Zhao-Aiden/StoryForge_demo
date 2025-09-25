@@ -1,28 +1,27 @@
 import { MongoClient, Db } from 'mongodb'
 
-let client: MongoClient
-let db: Db
+let mongoClient: MongoClient
+let database: Db
 
 export async function connectDB(): Promise<Db> {
-  if (!client) {
-    const MONGODB_URI = process.env.DATABASE_URL
+  if (!mongoClient) {
+    const connectionString = process.env.DATABASE_URL
     
-    if (!MONGODB_URI) {
+    if (!connectionString) {
       throw new Error('DATABASE_URL environment variable is not set')
     }
     
-    client = new MongoClient(MONGODB_URI)
-    await client.connect()
-    db = client.db('storyforge')
+    mongoClient = new MongoClient(connectionString)
+    await mongoClient.connect()
+    database = mongoClient.db('storyforge')
   }
-  return db
+  return database
 }
 
 export async function closeDB(): Promise<void> {
-  if (client) {
-    await client.close()
-    client = null as any
-    db = null as any
+  if (mongoClient) {
+    await mongoClient.close()
+    mongoClient = null as unknown as MongoClient
+    database = null as unknown as Db
   }
 }
-
