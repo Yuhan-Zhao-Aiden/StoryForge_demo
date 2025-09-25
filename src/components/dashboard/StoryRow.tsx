@@ -9,15 +9,8 @@ type Story = {
   lastEdited: string;
   collaborators: number;
 };
+    
 
-const sideButton =       
-  <button
-    type="button"
-    className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-    aria-label="More"
-  >
-    •••
-  </button>
 
 function StoryRow({ s, invitable }: { s: Story, invitable: boolean }) {
   return (
@@ -38,10 +31,24 @@ function StoryRow({ s, invitable }: { s: Story, invitable: boolean }) {
           Last edited: {s.lastEdited} • {s.collaborators} collaborator{s.collaborators === 1 ? "" : "s"}
         </p>
       </div>
-      {/* Kebab menu placeholder (non-functional) */}
+      {/* Kebab menu placeholder (non-funddctional) */}
       {
-        invitable ? <GenerateInvite roomId={s._id} trigger={sideButton}/>
-        : sideButton
+        invitable ? <GenerateInvite roomId={s._id} trigger={
+            <button
+              type="button"
+              className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="More"
+            >
+              •••
+            </button>
+        }/>
+        :   <button
+              type="button"
+              className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="More"
+            >
+              •••
+            </button>
       }
     </li>
   );

@@ -44,7 +44,7 @@ export default function LoginForm() {
       if (result.ok) {
         setSuccess('Welcome back! Redirecting to your home...')
         setTimeout(() => {
-          router.push('/')
+          router.push('/dashboard')
         }, 2000)
       } else {
         setError(result.error || 'Invalid credentials. Please try again.')
@@ -151,7 +151,7 @@ export default function LoginForm() {
           <div className="form-options">
             <div className="remember-me">
               <input type="checkbox" id="remember" className="checkbox" />
-              <label htmlFor="remember">Remember me</label>
+              <label htmlFor="remember" className='text-slate-500'>Remember me</label>
             </div>
             <Link href="/forgot-password" className="forgot-password">
               Forgot password?

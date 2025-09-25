@@ -187,7 +187,7 @@ export default async function DashboardPage() {
               <p className="text-sm text-muted-foreground">No owned stories yet.</p>
             ) : (
               <ul className="space-y-3">
-                {ownedStories.map((s) => (
+                { ownedStories.map((s) => (
                   <StoryRow key={s._id} s={s} invitable={true}/>
                 ))}
               </ul>
