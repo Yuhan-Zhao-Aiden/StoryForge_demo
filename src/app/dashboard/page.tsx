@@ -15,8 +15,9 @@ import StoryRow from "@/components/dashboard/StoryRow";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { NewStoryDialog } from "./_components/NewStoryDialog";
+import { NewStoryDialog } from "./_components/StoryForm";
 import { RedeemInvite } from "./_components/RedeemInvite";
+import { ActivityChart } from "@/components/dashboard/ActivityChart";
 
 // Types (keep Story consistent with StoryRow) 
 type Story = {
@@ -170,7 +171,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Recent Stories split into Owned & Collaborating */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 mb-6">
         {/* Owned (2/3 width) */}
         <Card className="lg:col-span-2 border-muted/60">
           <CardHeader className="flex-row items-center justify-between">
@@ -212,6 +213,10 @@ export default async function DashboardPage() {
             )}
           </CardContent>
         </Card>
+      </div>
+
+      <div className="mb-20">
+        <ActivityChart />
       </div>
     </div>
   );

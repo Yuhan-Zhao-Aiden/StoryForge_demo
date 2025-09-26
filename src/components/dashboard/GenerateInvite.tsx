@@ -98,7 +98,7 @@ export function GenerateInvite({ roomId, trigger }: Props) {
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
-        {trigger ?? <Button variant="outline">Generate Invite</Button>}
+        {/* {trigger ?? <Button variant="outline">Generate Invite</Button>} */}
       </DrawerTrigger>
       <DrawerContent>
         <DrawerHeader className="text-left">
