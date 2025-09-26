@@ -8,8 +8,8 @@ for **users**, **rooms**, **roomMembers**, **nodes**, and **edges**.
 ## Overview
 
 -   **Database:** MongoDB (Atlas or self-hosted)
--   **Database name:** `appdb_dev`
--   **Collections:** `users`, `rooms`, `roomMembers`, `nodes`, `edges`
+-   **Database name:** `storyforge`
+-   **Collections:** `users`, `rooms`, `roomMembers`, `nodes`, `edges`, `roomInvites`
 -   **ID type:** `ObjectId` (stored as strings in API responses)
 -   **Validation:** JSON Schema validators with
     `validationLevel: "moderate"`

@@ -48,7 +48,7 @@ export function RedeemInvite({ trigger, onSuccessNavigateToRoom = true }: Props)
       // Refresh dashboard or navigate to the room
       if (onSuccessNavigateToRoom && data?.roomId) {
         // If you have a slug, you can return it from the API instead and push(`/rooms/${slug}`)
-        router.push(`/rooms/${data.roomId}`); // adjust to your actual route pattern
+        router.push(`/dashboard`); // adjust to your actual route pattern
       } else {
         router.refresh();
       }
