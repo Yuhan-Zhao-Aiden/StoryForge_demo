@@ -34,7 +34,7 @@ function StoryRow({ s, invitable }: { s: Story, invitable: boolean }) {
       </div>
       {/* Kebab menu placeholder (non-funddctional) */}
       {
-        invitable ? <StoryMenu roomId={s._id} />
+        invitable ? <StoryMenu room={s} />
         :   <button
               type="button"
               className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"

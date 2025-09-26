@@ -15,7 +15,7 @@ import StoryRow from "@/components/dashboard/StoryRow";
 import { getCurrentUser } from "@/lib/auth";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
-import { NewStoryDialog } from "./_components/NewStoryDialog";
+import { NewStoryDialog } from "./_components/StoryForm";
 import { RedeemInvite } from "./_components/RedeemInvite";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
 

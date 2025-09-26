@@ -9,9 +9,18 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 import { GenerateInvite } from "./GenerateInvite";
+import { EditStoryDialog } from "@/app/dashboard/_components/StoryForm";
 import { useDeleteRoom } from "@/hooks/useDeleteRoom";
-
-export function StoryMenu({ roomId }: { roomId: string })  {
+type Story = {
+  _id: string;
+  title: string;
+  subtitle?: string;
+  status?: "Active" | "Draft" | "Published";
+  lastEdited: string;
+  collaborators: number;
+};
+    
+export function StoryMenu({ room }: { room: Story })  {
   const { handleDeleteStory, loading, error } = useDeleteRoom();
 
   return (
@@ -23,19 +32,24 @@ export function StoryMenu({ roomId }: { roomId: string })  {
         <DropdownMenuLabel>My Story</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <GenerateInvite 
-          roomId={roomId}
+          roomId={room._id}
           trigger={
             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
               Generate Invite
             </DropdownMenuItem>
           }  
         />
-        <DropdownMenuItem>Status</DropdownMenuItem>
+        <EditStoryDialog
+          roomId={room._id}
+          initialTitle={room.title}
+          initialSubtitle={room.subtitle}
+          trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Rename</DropdownMenuItem>}
+        />
         <DropdownMenuItem>Export</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem 
           className="bg-red-500 focus:bg-red-700"
-          onClick={() => handleDeleteStory(roomId)}
+          onClick={() => handleDeleteStory(room._id)}
           disabled={loading}
         >
           {loading ? "Deleting..." : "Delete Room"}
