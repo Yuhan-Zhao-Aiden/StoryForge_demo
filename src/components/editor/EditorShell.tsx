@@ -1,29 +1,24 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
   Background,
   Controls,
   MiniMap,
-  useNodesState,
-  useEdgesState,
-  addEdge,
-  Connection,
-  Edge,
-  Node,
+  OnSelectionChangeFunc,
+  OnMoveEnd,
 } from "@xyflow/react";
 
 import "@xyflow/react/dist/style.css";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { useStoryGraphStore } from "@/hooks/useStoryGraphStore";
+import type { StoryEdge, StoryNode } from "@/lib/types/editor";
+import { Input } from "@/components/ui/input";
+import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
 
 type EditorShellProps = {
   room: {
@@ -35,43 +30,150 @@ type EditorShellProps = {
 };
 
 export function EditorShell({ room }: EditorShellProps) {
-  const defaultNodes = useMemo<Node[]>(() => {
-    return [
-      {
-        id: "intro",
-        position: { x: 80, y: 80 },
-        data: { label: "Opening" },
-        type: "default",
-      },
-      {
-        id: "branch-1",
-        position: { x: 320, y: 200 },
-        data: { label: "Branch 1" },
-        type: "default",
-      },
-    ];
-  }, []);
+  const canEdit = room.role === "owner" || room.role === "editor";
+  const nodes = useStoryGraphStore((state) => state.nodes);
+  const edges = useStoryGraphStore((state) => state.edges);
+  const applyNodeChanges = useStoryGraphStore((state) => state.applyNodeChanges);
+  const applyEdgeChanges = useStoryGraphStore((state) => state.applyEdgeChanges);
+  const initializeGraph = useStoryGraphStore((state) => state.initializeGraph);
+  const setSelection = useStoryGraphStore((state) => state.setSelection);
+  const setViewportState = useStoryGraphStore((state) => state.setViewport);
+  const viewport = useStoryGraphStore((state) => state.viewport);
+  const dirty = useStoryGraphStore((state) => state.dirty);
+  const selectedNodeIds = useStoryGraphStore((state) => state.selectedNodeIds);
 
-  const defaultEdges = useMemo<Edge[]>(() => {
-    return [
-      {
-        id: "intro-branch-1",
-        source: "intro",
-        target: "branch-1",
-        type: "smoothstep",
-      },
-    ];
-  }, []);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const [nodes, , onNodesChange] = useNodesState(defaultNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(defaultEdges);
+  const {
+    createNode,
+    createChoiceNode,
+    updateNode,
+    deleteNode,
+    connectNodes,
+    savingLayout,
+    error: actionError,
+    clearError,
+  } = useStoryGraphActions(room.id, canEdit);
 
-  const handleConnect = useCallback(
-    (connection: Connection) => {
-      setEdges((currentEdges) => addEdge(connection, currentEdges));
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadGraph() {
+      setLoading(true);
+      setError(null);
+      try {
+        const [nodesRes, edgesRes] = await Promise.all([
+          fetch(`/api/rooms/${room.id}/nodes`, { cache: "no-store" }),
+          fetch(`/api/rooms/${room.id}/edges`, { cache: "no-store" }),
+        ]);
+
+        if (!nodesRes.ok) {
+          const detail = await nodesRes.json().catch(() => null);
+          throw new Error(detail?.error ?? "Failed to load nodes");
+        }
+        if (!edgesRes.ok) {
+          const detail = await edgesRes.json().catch(() => null);
+          throw new Error(detail?.error ?? "Failed to load edges");
+        }
+
+        const nodePayload: StoryNode[] =
+          nodesRes.status === 204
+            ? []
+            : ((await nodesRes.json()) as { nodes?: StoryNode[] }).nodes ?? [];
+        const edgePayload: StoryEdge[] =
+          edgesRes.status === 204
+            ? []
+            : ((await edgesRes.json()) as { edges?: StoryEdge[] }).edges ?? [];
+
+        if (!cancelled) {
+          initializeGraph({
+            roomId: room.id,
+            nodes: nodePayload,
+            edges: edgePayload,
+          });
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          const message = err instanceof Error ? err.message : "Unable to load story graph";
+          setError(message);
+        }
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadGraph();
+    return () => {
+      cancelled = true;
+    };
+  }, [initializeGraph, room.id]);
+
+  const handleSelectionChange = useCallback<OnSelectionChangeFunc>(
+    (selection) => {
+      setSelection(
+        selection.nodes.map((node) => node.id),
+        selection.edges.map((edge) => edge.id),
+      );
     },
-    [setEdges],
+    [setSelection],
   );
+
+  const handleMoveEnd = useCallback<OnMoveEnd>(
+    (_event, nextViewport) => {
+      setViewportState(nextViewport, { recordHistory: false });
+    },
+    [setViewportState],
+  );
+
+  const selectedNode = useMemo(() => {
+    if (!selectedNodeIds.length) return null;
+    return nodes.find((node) => node.id === selectedNodeIds[0]) ?? null;
+  }, [nodes, selectedNodeIds]);
+
+  const [nodeTitle, setNodeTitle] = useState("");
+  const [nodeContent, setNodeContent] = useState("");
+  const [nodeColor, setNodeColor] = useState("#2563eb");
+
+  useEffect(() => {
+    if (!selectedNode) {
+      setNodeTitle("");
+      setNodeContent("");
+      setNodeColor("#2563eb");
+      return;
+    }
+    setNodeTitle(selectedNode.data.title ?? "");
+    setNodeContent(selectedNode.data.content?.text ?? "");
+    setNodeColor(selectedNode.data.color ?? "#2563eb");
+  }, [selectedNode]);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const timeout = setTimeout(() => {
+      clearError();
+    }, 4000);
+    return () => clearTimeout(timeout);
+  }, [actionError, clearError]);
+
+  const handleSaveNodeDetails = useCallback(() => {
+    if (!selectedNode || !canEdit) return;
+    updateNode(selectedNode.id, {
+      title: nodeTitle || "Untitled Node",
+      color: nodeColor,
+      content: {
+        ...(selectedNode.data.content ?? {}),
+        text: nodeContent,
+        media: selectedNode.data.content?.media ?? [],
+      },
+    });
+  }, [selectedNode, canEdit, nodeTitle, nodeColor, nodeContent, updateNode]);
+
+  const handleDeleteNode = useCallback(() => {
+    if (!selectedNode || !canEdit) return;
+    deleteNode(selectedNode.id);
+  }, [selectedNode, canEdit, deleteNode]);
 
   return (
     <ReactFlowProvider>
@@ -97,13 +199,25 @@ export function EditorShell({ room }: EditorShellProps) {
           <section className="flex flex-1 flex-col">
             <div className="flex min-h-14 items-center justify-between border-b border-border bg-background/80 px-4">
               <div className="flex items-center gap-2">
-                <Button type="button" variant="outline" size="sm">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => createNode()}
+                  disabled={!canEdit}
+                >
                   Add Node
                 </Button>
-                <Button type="button" variant="outline" size="sm">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => createChoiceNode()}
+                  disabled={!canEdit}
+                >
                   Add Choice
                 </Button>
-                <Button type="button" variant="outline" size="sm">
+                <Button type="button" variant="outline" size="sm" disabled>
                   Connect
                 </Button>
               </div>
@@ -122,61 +236,117 @@ export function EditorShell({ room }: EditorShellProps) {
 
             <div className="relative flex-1 bg-muted/10">
               <ReactFlow
+                colorMode="dark"
+                key={room.id}
                 fitView
+                defaultViewport={viewport}
                 nodes={nodes}
                 edges={edges}
-                colorMode="dark"
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                onConnect={handleConnect}
+                onNodesChange={canEdit ? applyNodeChanges : undefined}
+                onEdgesChange={canEdit ? applyEdgeChanges : undefined}
+                onConnect={canEdit ? connectNodes : undefined}
+                onSelectionChange={handleSelectionChange}
+                onMoveEnd={handleMoveEnd}
+                nodesDraggable={canEdit}
+                nodesConnectable={canEdit}
+                elementsSelectable
                 className="bg-background"
               >
                 <MiniMap />
                 <Controls position="top-right" />
                 <Background gap={24} />
               </ReactFlow>
-              <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-md border border-dashed border-border bg-background/90 p-4 text-center text-sm text-muted-foreground">
-                Canvas placeholder — the story graph will appear here.
-              </div>
+              {loading ? (
+                <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-background/80 text-sm text-muted-foreground">
+                  Loading story graph…
+                </div>
+              ) : null}
+              {error ? (
+                <div className="pointer-events-none absolute inset-4 flex items-center justify-center rounded-md border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  {error}
+                </div>
+              ) : null}
+              {actionError ? (
+                <div className="pointer-events-none absolute inset-x-4 top-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+                  {actionError}
+                </div>
+              ) : null}
+              {!loading && !error && nodes.length === 0 ? (
+                <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-md border border-dashed border-border bg-background/90 p-4 text-center text-sm text-muted-foreground">
+                  No nodes yet — use the toolbar to start building your story.
+                </div>
+              ) : null}
             </div>
           </section>
 
           <aside className="hidden w-80 border-l border-border bg-background/95 px-4 py-6 text-sm text-muted-foreground lg:block">
             <h2 className="mb-2 text-base font-semibold text-foreground">Details</h2>
-            <p className="mb-4">Select a node to view and edit its content.</p>
-            <div className="space-y-3 text-xs">
-              <Card className="border-dashed">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-semibold">
-                    Inline Editor
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-muted-foreground">
-                  Placeholder controls for node content editing.
-                </CardContent>
-              </Card>
-              <Card className="border-dashed">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-xs font-semibold">
-                    Story Preview
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-muted-foreground">
-                  Placeholder for story playback and flow preview.
-                </CardContent>
-              </Card>
-            </div>
+            {selectedNode ? (
+              <div className="space-y-4 text-xs">
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Title
+                  </label>
+                  <Input
+                    value={nodeTitle}
+                    onChange={(e) => setNodeTitle(e.target.value)}
+                    disabled={!canEdit}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Color
+                  </label>
+                  <input
+                    type="color"
+                    value={nodeColor}
+                    onChange={(e) => setNodeColor(e.target.value)}
+                    disabled={!canEdit}
+                    className="h-9 w-16 cursor-pointer rounded border border-border bg-background"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    Content
+                  </label>
+                  <textarea
+                    value={nodeContent}
+                    onChange={(e) => setNodeContent(e.target.value)}
+                    disabled={!canEdit}
+                    className="min-h-24 w-full rounded border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
+                  />
+                </div>
+                {canEdit ? (
+                  <div className="flex items-center justify-between">
+                    <Button size="sm" onClick={handleSaveNodeDetails}>
+                      Save Changes
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      onClick={handleDeleteNode}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Select a node to view and edit its content.</p>
+            )}
           </aside>
         </div>
 
         <footer className="border-t border-border bg-muted/30 px-6 py-3">
           <Card className="border-none bg-transparent shadow-none">
             <CardContent className="flex items-center justify-between px-0 py-0 text-xs text-muted-foreground">
-              <span>Status: Ready</span>
+              <span>Status: {dirty ? "Unsaved changes" : "Up to date"}</span>
               <div className="flex items-center gap-3">
                 <span>Nodes: {nodes.length}</span>
                 <span>Edges: {edges.length}</span>
-                <span>Zoom: 100%</span>
+                <span>{savingLayout ? "Saving layout…" : "Layout saved"}</span>
               </div>
             </CardContent>
           </Card>
