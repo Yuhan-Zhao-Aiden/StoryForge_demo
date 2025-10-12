@@ -1,3 +1,4 @@
+import { NextRequest } from "next/server";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
@@ -87,15 +88,25 @@ function buildEdgeUpdate(update: z.infer<typeof edgeUpdateSchema>) {
   return set;
 }
 
-export async function GET(_: Request, { params }: { params: { roomId: string } }) {
-  const access = await requireRoomAccess(params.roomId);
+type RouteContext = {
+  params: { roomId: string } | Promise<{ roomId: string }>;
+};
+
+async function getRoomIdFromContext(context: RouteContext) {
+  const params = await Promise.resolve(context.params);
+  return params.roomId;
+}
+
+export async function GET(_req: NextRequest, context: RouteContext) {
+  const roomId = await getRoomIdFromContext(context);
+  const access = await requireRoomAccess(roomId);
   if (!access.ok) return access.response;
 
-  const { db, roomId } = access.context;
+  const { db, roomId: roomObjectId } = access.context;
 
   const edges = await db
     .collection<EdgeDocument>("edges")
-    .find({ roomId })
+    .find({ roomId: roomObjectId })
     .sort({ createdAt: 1 })
     .toArray();
 
@@ -104,11 +115,12 @@ export async function GET(_: Request, { params }: { params: { roomId: string } }
   });
 }
 
-export async function POST(req: Request, { params }: { params: { roomId: string } }) {
-  const access = await requireRoomAccess(params.roomId, { requireWrite: true });
+export async function POST(req: NextRequest, context: RouteContext) {
+  const roomId = await getRoomIdFromContext(context);
+  const access = await requireRoomAccess(roomId, { requireWrite: true });
   if (!access.ok) return access.response;
 
-  const { db, roomId } = access.context;
+  const { db, roomId: roomObjectId } = access.context;
   const body = await req.json().catch(() => null);
   if (!body) return jsonError(400, "Invalid JSON body");
 
@@ -124,7 +136,7 @@ export async function POST(req: Request, { params }: { params: { roomId: string 
   }
 
   const now = new Date();
-  const docs = parsed.edges.map((edge) => buildInsertDocument(edge, roomId, now));
+  const docs = parsed.edges.map((edge) => buildInsertDocument(edge, roomObjectId, now));
 
   await db.collection("edges").insertMany(docs);
 
@@ -140,11 +152,12 @@ export async function POST(req: Request, { params }: { params: { roomId: string 
   );
 }
 
-export async function PATCH(req: Request, { params }: { params: { roomId: string } }) {
-  const access = await requireRoomAccess(params.roomId, { requireWrite: true });
+export async function PATCH(req: NextRequest, context: RouteContext) {
+  const roomId = await getRoomIdFromContext(context);
+  const access = await requireRoomAccess(roomId, { requireWrite: true });
   if (!access.ok) return access.response;
 
-  const { db, roomId } = access.context;
+  const { db, roomId: roomObjectId } = access.context;
   const body = await req.json().catch(() => null);
   if (!body) return jsonError(400, "Invalid JSON body");
 
@@ -159,7 +172,7 @@ export async function PATCH(req: Request, { params }: { params: { roomId: string
 
   const operations = parsed.updates.map((update) => ({
     updateOne: {
-      filter: { _id: new ObjectId(update.id), roomId },
+      filter: { _id: new ObjectId(update.id), roomId: roomObjectId },
       update: { $set: buildEdgeUpdate(update) },
     },
   }));
@@ -172,7 +185,7 @@ export async function PATCH(req: Request, { params }: { params: { roomId: string
 
   const ids = parsed.updates.map((update) => new ObjectId(update.id));
   const updatedEdges = await edgesCollection
-    .find<EdgeDocument>({ _id: { $in: ids }, roomId })
+    .find<EdgeDocument>({ _id: { $in: ids }, roomId: roomObjectId })
     .toArray();
 
   return jsonSuccess({
@@ -180,11 +193,12 @@ export async function PATCH(req: Request, { params }: { params: { roomId: string
   });
 }
 
-export async function DELETE(req: Request, { params }: { params: { roomId: string } }) {
-  const access = await requireRoomAccess(params.roomId, { requireWrite: true });
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const roomId = await getRoomIdFromContext(context);
+  const access = await requireRoomAccess(roomId, { requireWrite: true });
   if (!access.ok) return access.response;
 
-  const { db, roomId } = access.context;
+  const { db, roomId: roomObjectId } = access.context;
   const body = await req.json().catch(() => null);
   if (!body) return jsonError(400, "Invalid JSON body");
 
@@ -199,7 +213,7 @@ export async function DELETE(req: Request, { params }: { params: { roomId: strin
 
   const result = await db.collection("edges").deleteMany({
     _id: { $in: ids },
-    roomId,
+    roomId: roomObjectId,
   });
 
   return jsonSuccess({
