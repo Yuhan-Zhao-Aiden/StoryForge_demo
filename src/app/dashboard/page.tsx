@@ -27,6 +27,7 @@ type Story = {
   status?: "Active" | "Draft" | "Published";
   lastEdited: string;
   collaborators: number;
+  role: "owner" | "editor" | "viewer";
 };
 
 // DB room doc (minimal fields we use)
@@ -45,7 +46,7 @@ function formatDateISO(d?: Date) {
   return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 }
 
-function roomToStory(r: RoomDoc): Story {
+function roomToStory(r: RoomDoc, role: Story["role"]): Story {
   const status: Story["status"] =
     r.visibility === "public" ? "Published" :
     r.visibility === "unlisted" ? "Draft" : "Active";
@@ -57,6 +58,7 @@ function roomToStory(r: RoomDoc): Story {
     status,
     lastEdited: formatDateISO(r.updatedAt),
     collaborators: r.collaborators ?? 0,
+    role,
   };
 }
 
@@ -104,14 +106,21 @@ async function loadData() {
   // Build collaborating list aligned to memberships order
   const collabMap = new Map<string, RoomDoc>();
   collabRooms.forEach((r) => collabMap.set(String(r._id), r));
-  const collaboratingRooms: RoomDoc[] = memberships
-    .map((m: any) => collabMap.get(String(m.roomId)))
-    .filter((r): r is RoomDoc => !!r);
+  const collaboratingRooms = memberships
+    .map((m: any) => {
+      const room = collabMap.get(String(m.roomId));
+      if (!room) return null;
+      const membershipRole = m.role === "editor" ? "editor" : "viewer";
+      return { room, role: membershipRole as Story["role"] };
+    })
+    .filter((value): value is { room: RoomDoc; role: Story["role"] } => !!value);
 
   // If any room is missing `collaborators`, compute from roomMembers (count - 1 owner)
   const missingIds = [
     ...ownedRooms.filter((r) => r.collaborators == null).map((r) => r._id),
-    ...collaboratingRooms.filter((r) => r.collaborators == null).map((r) => r._id),
+    ...collaboratingRooms
+      .filter(({ room }) => room.collaborators == null)
+      .map(({ room }) => room._id),
   ];
   if (missingIds.length) {
     const counts = await db
@@ -123,12 +132,14 @@ async function loadData() {
       .toArray();
     const countMap = new Map<string, number>(counts.map((c) => [String(c._id), Math.max(0, c.count - 1)]));
     ownedRooms.forEach((r) => { if (r.collaborators == null) r.collaborators = countMap.get(String(r._id)) ?? 0; });
-    collaboratingRooms.forEach((r) => { if (r.collaborators == null) r.collaborators = countMap.get(String(r._id)) ?? 0; });
+    collaboratingRooms.forEach(({ room }) => {
+      if (room.collaborators == null) room.collaborators = countMap.get(String(room._id)) ?? 0;
+    });
   }
 
   // Normalize to Story[]
-  const ownedStories: Story[] = ownedRooms.map(roomToStory);
-  const collabStories: Story[] = collaboratingRooms.map(roomToStory);
+  const ownedStories: Story[] = ownedRooms.map((room) => roomToStory(room, "owner"));
+  const collabStories: Story[] = collaboratingRooms.map(({ room, role }) => roomToStory(room, role));
 
   return {
     user: { username: (me as any).username ?? null, email: me.email },

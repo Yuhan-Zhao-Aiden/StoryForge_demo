@@ -18,6 +18,7 @@ type Story = {
   status?: "Active" | "Draft" | "Published";
   lastEdited: string;
   collaborators: number;
+  role?: "owner" | "editor" | "viewer";
 };
     
 export function StoryMenu({ room }: { room: Story })  {
