@@ -29,12 +29,10 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-      # ESLint steps removed as requested
-
       - name: Build project
         run: npm run build
 
-      - name: Build project (skip type checking)
+      - name: Optional build (skip type checking)
         run: |
           npx next build --turbopack --no-lint || echo "Build completed with warnings"
         continue-on-error: true
@@ -47,7 +45,7 @@ jobs:
             echo "No tests configured - skipping test step"
           fi
 
-# Deployment steps commented out
+# Deployment steps commented out, not used
 #  deploy:
 #    name: Deploy to Production
 #    runs-on: ubuntu-latest
@@ -67,16 +65,5 @@ jobs:
 #        run: npm ci
 #      - name: Build project
 #        run: npm run build
-#      - name: Deploy preparation
 #      - name: Display status
-#        run: |
-#          echo " Application built successfully!"
-#          echo " Build: Completed successfully"
-#          echo " Ready for deployment to your hosting platform"
-#      - name: Deploy to Vercel
-#        uses: vercel/action@v1
-#        with:
-#          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-#          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-#          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-#          echo "🚀 CI/CD Pipeline completed!"
+#        run: echo "✅ Build completed. Ready for deployment"
