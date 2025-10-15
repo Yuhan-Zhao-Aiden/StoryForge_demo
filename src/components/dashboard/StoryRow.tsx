@@ -1,5 +1,4 @@
 import Link from "next/link";
-
 import { Badge } from "@/components/ui/badge";
 import { StoryMenu } from "./DropDownMenu";
 
@@ -18,7 +17,7 @@ function capitalize(word?: string) {
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-function StoryRow({ s, invitable }: { s: Story; invitable: boolean }) {
+function StoryRow({ s }: { s: Story }) {
   const href = `/rooms/${s._id}/editor`;
   const roleLabel = s.role && s.role !== "owner" ? capitalize(s.role) : null;
 
@@ -32,38 +31,30 @@ function StoryRow({ s, invitable }: { s: Story; invitable: boolean }) {
           <div className="font-medium leading-tight group-hover:underline">
             {s.title}
           </div>
-          {s.status ? (
+          {s.status && (
             <Badge variant="secondary" className="h-5 px-2 text-[11px]">
               {s.status}
             </Badge>
-          ) : null}
-          {roleLabel ? (
+          )}
+          {roleLabel && (
             <Badge variant="outline" className="h-5 px-2 text-[11px]">
               {roleLabel}
             </Badge>
-          ) : null}
+          )}
         </div>
-        {s.subtitle ? (
+        {s.subtitle && (
           <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
             {s.subtitle}
           </p>
-        ) : null}
+        )}
         <p className="mt-1 text-xs text-muted-foreground">
           Last edited: {s.lastEdited} • {s.collaborators} collaborator
           {s.collaborators === 1 ? "" : "s"}
         </p>
       </Link>
-      {invitable ? (
-        <StoryMenu room={s} />
-      ) : (
-        <button
-          type="button"
-          className="rounded p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-          aria-label="More"
-        >
-          •••
-        </button>
-      )}
+
+      {/* Always show dropdown */}
+      <StoryMenu room={s} />
     </li>
   );
 }
