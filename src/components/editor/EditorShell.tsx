@@ -19,6 +19,7 @@ import { useStoryGraphStore } from "@/hooks/useStoryGraphStore";
 import type { StoryEdge, StoryNode } from "@/lib/types/editor";
 import { Input } from "@/components/ui/input";
 import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
+import { useRouter } from "next/navigation";
 
 type EditorShellProps = {
   room: {
@@ -33,8 +34,13 @@ export function EditorShell({ room }: EditorShellProps) {
   const canEdit = room.role === "owner" || room.role === "editor";
   const nodes = useStoryGraphStore((state) => state.nodes);
   const edges = useStoryGraphStore((state) => state.edges);
-  const applyNodeChanges = useStoryGraphStore((state) => state.applyNodeChanges);
-  const applyEdgeChanges = useStoryGraphStore((state) => state.applyEdgeChanges);
+  const router = useRouter();
+  const applyNodeChanges = useStoryGraphStore(
+    (state) => state.applyNodeChanges
+  );
+  const applyEdgeChanges = useStoryGraphStore(
+    (state) => state.applyEdgeChanges
+  );
   const initializeGraph = useStoryGraphStore((state) => state.initializeGraph);
   const setSelection = useStoryGraphStore((state) => state.setSelection);
   const setViewportState = useStoryGraphStore((state) => state.setViewport);
@@ -95,7 +101,8 @@ export function EditorShell({ room }: EditorShellProps) {
         }
       } catch (err: unknown) {
         if (!cancelled) {
-          const message = err instanceof Error ? err.message : "Unable to load story graph";
+          const message =
+            err instanceof Error ? err.message : "Unable to load story graph";
           setError(message);
         }
       } finally {
@@ -115,17 +122,17 @@ export function EditorShell({ room }: EditorShellProps) {
     (selection) => {
       setSelection(
         selection.nodes.map((node) => node.id),
-        selection.edges.map((edge) => edge.id),
+        selection.edges.map((edge) => edge.id)
       );
     },
-    [setSelection],
+    [setSelection]
   );
 
   const handleMoveEnd = useCallback<OnMoveEnd>(
     (_event, nextViewport) => {
       setViewportState(nextViewport, { recordHistory: false });
     },
-    [setViewportState],
+    [setViewportState]
   );
 
   const selectedNode = useMemo(() => {
@@ -180,7 +187,9 @@ export function EditorShell({ room }: EditorShellProps) {
       <div className="flex h-screen max-h-[calc(100vh-4rem)] flex-col bg-background text-foreground">
         <header className="flex items-center justify-between gap-4 border-b border-border bg-muted/40 px-6 py-4">
           <div>
-            <h1 className="text-lg font-semibold leading-tight">{room.title}</h1>
+            <h1 className="text-lg font-semibold leading-tight">
+              {room.title}
+            </h1>
             {room.subtitle ? (
               <p className="text-sm text-muted-foreground">{room.subtitle}</p>
             ) : null}
@@ -280,7 +289,9 @@ export function EditorShell({ room }: EditorShellProps) {
           </section>
 
           <aside className="hidden w-80 border-l border-border bg-background/95 px-4 py-6 text-sm text-muted-foreground lg:block">
-            <h2 className="mb-2 text-base font-semibold text-foreground">Details</h2>
+            <h2 className="mb-2 text-base font-semibold text-foreground">
+              Details
+            </h2>
             {selectedNode ? (
               <div className="space-y-4 text-xs">
                 <div>
@@ -317,24 +328,40 @@ export function EditorShell({ room }: EditorShellProps) {
                     className="min-h-24 w-full rounded border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
                   />
                 </div>
-                {canEdit ? (
+                {selectedNode && (
                   <div className="flex items-center justify-between">
                     <Button size="sm" onClick={handleSaveNodeDetails}>
                       Save Changes
                     </Button>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="destructive"
-                      onClick={handleDeleteNode}
-                    >
-                      Delete
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          router.push(
+                            `/rooms/${room.id}/editor/nodes/${selectedNode.id}/comments`
+                          );
+                        }}
+                      >
+                        Comments
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="destructive"
+                        onClick={handleDeleteNode}
+                      >
+                        Delete
+                      </Button>
+                    </div>
                   </div>
-                ) : null}
+                )}
               </div>
             ) : (
-              <p className="text-sm text-muted-foreground">Select a node to view and edit its content.</p>
+              <p className="text-sm text-muted-foreground">
+                Select a node to view and edit its content.
+              </p>
             )}
           </aside>
         </div>
