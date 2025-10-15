@@ -1,4 +1,4 @@
-"use client"
+"use client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -6,56 +6,93 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 
 import { GenerateInvite } from "./GenerateInvite";
 import { EditStoryDialog } from "@/app/dashboard/_components/StoryForm";
+import { ViewCollaboratorsDialog } from "./ViewCollaboratorsDialog"; 
 import { useDeleteRoom } from "@/hooks/useDeleteRoom";
+import { useLeaveRoom } from "@/hooks/useLeaveRoom"; 
+
 type Story = {
   _id: string;
   title: string;
   subtitle?: string;
   status?: "Active" | "Draft" | "Published";
-  lastEdited: string;
   collaborators: number;
   role?: "owner" | "editor" | "viewer";
 };
-    
-export function StoryMenu({ room }: { room: Story })  {
-  const { handleDeleteStory, loading, error } = useDeleteRoom();
+
+export function StoryMenu({ room }: { room: Story }) {
+  const { handleDeleteStory, loading: deleteLoading } = useDeleteRoom();
+  const { handleLeaveRoom, loading: leaveLoading } = useLeaveRoom();
+
+
+  const isOwner = room.role === "owner";
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>
-        •••
-      </DropdownMenuTrigger>
-      <DropdownMenuContent className="min-w-[200]">
+      <DropdownMenuTrigger>•••</DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-[200px]">
         <DropdownMenuLabel>My Story</DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <GenerateInvite 
+
+        {/* Generate Invite available for all */}
+        <GenerateInvite
           roomId={room._id}
           trigger={
             <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
               Generate Invite
             </DropdownMenuItem>
-          }  
+          }
         />
-        <EditStoryDialog
+
+        {/* View Collaborators available for all */}
+        <ViewCollaboratorsDialog
           roomId={room._id}
-          initialTitle={room.title}
-          initialSubtitle={room.subtitle}
-          trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Rename</DropdownMenuItem>}
+          trigger={
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              View Collaborators
+            </DropdownMenuItem>
+          }
         />
-        <DropdownMenuItem>Export</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem 
-          className="bg-red-500 focus:bg-red-700"
-          onClick={() => handleDeleteStory(room._id)}
-          disabled={loading}
-        >
-          {loading ? "Deleting..." : "Delete Room"}
-        </DropdownMenuItem>
+
+        {/* Owner-specific options */}
+        {isOwner && (
+          <>
+            <EditStoryDialog
+              roomId={room._id}
+              initialTitle={room.title}
+              initialSubtitle={room.subtitle}
+              trigger={
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                  Rename
+                </DropdownMenuItem>
+              }
+            />
+            <DropdownMenuItem>Export</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="bg-red-500 focus:bg-red-700"
+              onClick={() => handleDeleteStory(room._id)}
+              disabled={deleteLoading}
+            >
+              {deleteLoading ? "Deleting..." : "Delete Room"}
+            </DropdownMenuItem>
+          </>
+        )}
+
+        {/* Collaborator-specific option */}
+        {!isOwner && (
+          <DropdownMenuItem
+            className="bg-red-500 focus:bg-red-700"
+            onClick={() => handleLeaveRoom(room._id)}
+            disabled={leaveLoading}
+          >
+            {leaveLoading ? "Leaving..." : "Leave Room"}
+          </DropdownMenuItem>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }
