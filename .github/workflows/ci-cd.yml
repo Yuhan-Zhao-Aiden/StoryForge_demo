@@ -11,8 +11,9 @@ on:
 
 jobs:
   build-and-test:
-    name: Build and Test
+    name: Continuous Integration
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -27,17 +28,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run ESLint
-        run: npm run lint || echo "ESLint completed with warnings"
+      - name: Run ESLint (fail on error)
+        run: npm run lint
 
-      - name: Build project (skip type checking)
-        run: |
-          npx next build --turbopack --no-lint || echo "Build completed with warnings"
-        continue-on-error: true
+      - name: Type check
+        run: npx tsc --noEmit
 
-      - name: Basic verification
-        run: |
+      - name: Build project
+        run: npm run build
 
+      - name: Verify build
+        run: echo "✅ Build completed successfully"
 
   security-check:
     name: Security Audit
@@ -58,16 +59,35 @@ jobs:
 
       - name: Run npm audit
         run: npm audit --audit-level=high
-        continue-on-error: true
 
-  success-message:
-    name: Pipeline Status
+  deploy:
+    name: Deploy to Production (Vercel)
     runs-on: ubuntu-latest
     needs: [build-and-test, security-check]
-    
-    steps:
-      - name: Display status
-        run: |
-          echo "🚀 CI/CD Pipeline completed!"
+    if: github.ref == 'refs/heads/main'
 
-          
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Deploy to Vercel
+        uses: vercel/action@v1
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Confirm deployment
+        run: echo "🚀 Deployment to Vercel complete"
