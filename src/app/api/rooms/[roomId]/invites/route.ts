@@ -1,4 +1,4 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
@@ -7,21 +7,27 @@ import { getCurrentUser } from "@/lib/auth";
 import { generateInviteCode, hashInviteCode } from "@/lib/invites";
 import { getUserRoomRole, hasPermission } from "@/lib/permissions";
 
+type RouteContext = {
+  params: { roomId: string } | Promise<{ roomId: string }>;
+};
+
 const bodySchema = z.object({
   role: z.enum(["editor", "viewer"]).default("viewer"),
   maxUses: z.number().int().positive().nullable().optional(), // null = unlimited
   expiresAt: z.string().datetime().nullable().optional(),      // ISO string or null
 });
 
-export async function POST(
-  req: Request,
-  { params }: { params: { roomId: string } }
-) {
+async function getRoomIdFromContext(context: RouteContext) {
+  const params = await Promise.resolve(context.params);
+  return params.roomId;
+}
+
+export async function POST(req: NextRequest, context: RouteContext) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = await getDb();
-  const { roomId } = await params;
+  const roomId = await getRoomIdFromContext(context);
   const roomObjId = new ObjectId(roomId);
 
   let parsed: z.infer<typeof bodySchema>;

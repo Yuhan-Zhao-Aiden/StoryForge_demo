@@ -3,8 +3,17 @@ import { ObjectId } from "mongodb";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 
-export async function POST(req: NextRequest, context: { params: { roomId: string } }) {
-  const { roomId } = context.params;
+type RouteContext = {
+  params: { roomId: string } | Promise<{ roomId: string }>;
+};
+
+async function getRoomIdFromContext(context: RouteContext) {
+  const params = await Promise.resolve(context.params);
+  return params.roomId;
+}
+
+export async function POST(req: NextRequest, context: RouteContext) {
+  const roomId = await getRoomIdFromContext(context);
 
   const user = await getCurrentUser();
   if (!user) {
