@@ -78,16 +78,18 @@ export default function RegisterForm() {
       })
 
       const result = await response.json()
+      console.log('Registration response:', result);
 
       if (result.ok) {
         setSuccess('Account created successfully! Please check your email to verify your account.')
-        // Reset form
         setTimeout(() => {
           router.push('/login')
         }, 3000)
       } else {
-        setError(result.error || 'Registration failed')
-        // Focus first invalid field
+        const errorMessage = result.error || 'Registration failed';
+        console.log('Setting error:', errorMessage);
+        setError(errorMessage);
+        
         if (result.error?.includes('username')) {
           setFocus('username')
         } else if (result.error?.includes('email')) {

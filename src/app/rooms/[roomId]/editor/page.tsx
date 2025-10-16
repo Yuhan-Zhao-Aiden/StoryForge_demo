@@ -80,5 +80,5 @@ export default async function RoomEditorPage({ params }: PageParams) {
 
   const room = await loadRoomMetadata(roomId, user.id);
 
-  return <EditorShell room={room} />;
+  return <EditorShell room={room} currentUserId={user.id} />;
 }
