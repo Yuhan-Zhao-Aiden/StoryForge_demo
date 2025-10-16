@@ -23,7 +23,6 @@ import { Input } from "@/components/ui/input";
 import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
 import { useRouter } from "next/navigation";
 import StoryNodeCard from "@/components/editor/StoryNodeCard";
-import PresenceIndicator from "@/components/editor/PresenceIndicator";
 
 const storyNodeTypes: NodeTypes = {
   scene: StoryNodeCard,
@@ -40,10 +39,9 @@ type EditorShellProps = {
     subtitle?: string | null;
     role: "owner" | "editor" | "viewer";
   };
-  currentUserId: string;
 };
 
-export function EditorShell({ room, currentUserId }: EditorShellProps) {
+export function EditorShell({ room }: EditorShellProps) {
   const canEdit = room.role === "owner" || room.role === "editor";
   const nodes = useStoryGraphStore((state) => state.nodes);
   const edges = useStoryGraphStore((state) => state.edges);
@@ -299,7 +297,6 @@ export function EditorShell({ room, currentUserId }: EditorShellProps) {
             ) : null}
           </div>
           <div className="flex items-center gap-3">
-            <PresenceIndicator roomId={room.id} currentUserId={currentUserId} />
             <Badge 
               variant="outline" 
               className={`uppercase ${

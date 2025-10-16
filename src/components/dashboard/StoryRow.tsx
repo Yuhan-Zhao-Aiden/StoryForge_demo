@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { StoryMenu } from "./DropDownMenu";
 import { RoomStats } from "./RoomStats";
-import DashboardPresence from "./DashboardPresence";
 
 type Story = {
   _id: string;
@@ -55,12 +54,9 @@ function StoryRow({ s, invitable = true }: StoryRowProps) {
               {s.subtitle}
             </p>
           )}
-          <div className="mt-1 flex items-center gap-3">
-            <p className="text-xs text-muted-foreground">
-              Last edited: {s.lastEdited}
-            </p>
-            <DashboardPresence roomId={s._id} />
-          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Last edited: {s.lastEdited}
+          </p>
         </Link>
         <RoomStats roomId={s._id} />
       </div>
