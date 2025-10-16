@@ -18,9 +18,10 @@ export async function POST(request: NextRequest) {
     const result = await register(username, email, password, newsletter || false)
 
     if (!result.ok) {
+      console.log('Registration failed:', result.error);
       return NextResponse.json(
         { ok: false, error: result.error },
-        { status: result.error === 'Email already in use' || result.error === 'Username already taken' ? 409 : 400 }
+        { status: result.error?.includes('Email') || result.error?.includes('Username') ? 409 : 400 }
       )
     }
 

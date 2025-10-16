@@ -5,6 +5,7 @@ import { z } from "zod";
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { generateInviteCode, hashInviteCode } from "@/lib/invites";
+import { getUserRoomRole, hasPermission } from "@/lib/permissions";
 
 type RouteContext = {
   params: { roomId: string } | Promise<{ roomId: string }>;
@@ -35,16 +36,18 @@ export async function POST(req: NextRequest, context: RouteContext) {
   } catch (e: any) {
     return NextResponse.json({ error: e?.errors ?? "Invalid body" }, { status: 400 });
   }
-
-  // Permission: only owner (adjust if editors can create invites)
+  const userIdObj = new ObjectId(user.id);
+  const userRole = await getUserRoomRole(db, roomObjId, userIdObj);
+  
+  if (!userRole || !hasPermission(userRole, "INVITE_COLLABORATORS")) {
+    return NextResponse.json({ error: "Forbidden - Only room owners can create invites" }, { status: 403 });
+  }
+  
   const room = await db.collection("rooms").findOne(
     { _id: roomObjId },
     { projection: { ownerId: 1 } }
   );
   if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
-  if (room.ownerId?.toString() !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const code = generateInviteCode(10);
   const codeHash = hashInviteCode(code);
