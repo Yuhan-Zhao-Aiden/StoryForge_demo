@@ -1,5 +1,6 @@
 // app/(dashboard)/page.tsx
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -18,6 +19,9 @@ import { ObjectId } from "mongodb";
 import { NewStoryDialog } from "./_components/StoryForm";
 import { RedeemInvite } from "./_components/RedeemInvite";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
+
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 // Types (keep Story consistent with StoryRow) 
 type Story = {
@@ -65,7 +69,7 @@ function roomToStory(r: RoomDoc, role: Story["role"]): Story {
 // Data loader (server) 
 async function loadData() {
   const me = await getCurrentUser();
-  if (!me) throw new Error("Unauthorized");
+  if (!me) redirect("/login");
 
   const db = await getDb();
 

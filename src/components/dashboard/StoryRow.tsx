@@ -12,12 +12,17 @@ type Story = {
   role?: "owner" | "editor" | "viewer";
 };
 
+type StoryRowProps = {
+  s: Story;
+  invitable?: boolean;
+};
+
 function capitalize(word?: string) {
   if (!word) return "";
   return word.charAt(0).toUpperCase() + word.slice(1);
 }
 
-function StoryRow({ s }: { s: Story }) {
+function StoryRow({ s, invitable = true }: StoryRowProps) {
   const href = `/rooms/${s._id}/editor`;
   const roleLabel = s.role && s.role !== "owner" ? capitalize(s.role) : null;
 
@@ -54,7 +59,7 @@ function StoryRow({ s }: { s: Story }) {
       </Link>
 
       {/* Always show dropdown */}
-      <StoryMenu room={s} />
+      <StoryMenu room={s} invitable={invitable} />
     </li>
   );
 }

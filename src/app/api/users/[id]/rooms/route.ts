@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getDb } from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
 
 const BYPASS = process.env.BYPASS_AUTH === "true";
 const BYPASS_SECRET = process.env.BYPASS_SECRET;
+
+type RouteContext = {
+  params: { id: string } | Promise<{ id: string }>;
+};
 
 async function checkAuth(req: NextRequest) {
   if (BYPASS) {
@@ -17,15 +20,20 @@ async function checkAuth(req: NextRequest) {
   return { ok: false, code: 401, message: "Auth not ready" };
 }
 
+async function getUserIdFromContext(context: RouteContext) {
+  const params = await Promise.resolve(context.params);
+  return params.id;
+}
+
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: RouteContext
 ) {
   const auth = await checkAuth(req);
   if (!auth.ok) 
     return NextResponse.json({ error: auth.message }, { status: auth.code });
 
-  const { id } = params;
+  const id = await getUserIdFromContext(context);
   if (!ObjectId.isValid(id)) 
     return NextResponse.json({ error: "Invalid id" }, { status: 404 });
 
