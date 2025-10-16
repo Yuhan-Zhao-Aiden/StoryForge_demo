@@ -29,7 +29,7 @@ export default function DashboardPresence({ roomId }: DashboardPresenceProps) {
 
   useEffect(() => {
     fetchPresence();
-    const interval = setInterval(fetchPresence, 5000);
+    const interval = setInterval(fetchPresence, 15000); // Changed from 5s to 15s
     return () => clearInterval(interval);
   }, [fetchPresence]);
 

@@ -89,8 +89,8 @@ export default function PresenceIndicator({
     updatePresence();
     fetchPresence();
 
-    const presenceInterval = setInterval(updatePresence, 10000);
-    const fetchInterval = setInterval(fetchPresence, 3000);
+    const presenceInterval = setInterval(updatePresence, 20000); // Changed from 10s to 20s
+    const fetchInterval = setInterval(fetchPresence, 10000); // Changed from 3s to 10s
 
     const handleBeforeUnload = () => {
       leavePresence();
