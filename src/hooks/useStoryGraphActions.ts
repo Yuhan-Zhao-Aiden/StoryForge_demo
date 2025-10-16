@@ -16,6 +16,7 @@ type UseStoryGraphActionsResult = {
   updateNode: (id: string, patch: Partial<StoryNode>) => Promise<void>;
   deleteNode: (id: string) => Promise<void>;
   connectNodes: (connection: Connection) => Promise<void>;
+  deleteEdges: (ids: string[]) => Promise<void>;
   savingLayout: boolean;
   error: string | null;
   clearError: () => void;
@@ -277,6 +278,40 @@ export function useStoryGraphActions(roomId: string, canEdit: boolean): UseStory
     [addNode, addEdgeToStore, canEdit, markSaved, removeEdgeFromStore, removeNodeFromStore, roomId, setDirty],
   );
 
+  const deleteEdges = useCallback(
+    async (ids: string[]) => {
+      if (!canEdit || !ids.length) return;
+      const currentState = useStoryGraphStore.getState();
+      const edgesToDelete = currentState.edges
+        .filter((edge) => ids.includes(edge.id))
+        .map(flowEdgeToStoryEdge);
+
+      if (!edgesToDelete.length) return;
+
+      edgesToDelete.forEach((edge) => removeEdgeFromStore(edge.id));
+      setDirty(true);
+
+      try {
+        const res = await fetch(`/api/rooms/${roomId}/edges`, {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ids }),
+        });
+
+        if (!res.ok) {
+          const detail = await res.json().catch(() => null);
+          throw new Error(detail?.error ?? "Failed to delete edge");
+        }
+        markSaved();
+      } catch (err: unknown) {
+        edgesToDelete.forEach((edge) => addEdgeToStore(edge));
+        const message = err instanceof Error ? err.message : "Unable to delete edge";
+        setError(message);
+      }
+    },
+    [addEdgeToStore, canEdit, markSaved, removeEdgeFromStore, roomId, setDirty],
+  );
+
   const connectNodes = useCallback(
     async (connection: Connection) => {
       if (!canEdit) return;
@@ -343,10 +378,11 @@ export function useStoryGraphActions(roomId: string, canEdit: boolean): UseStory
       updateNode,
       deleteNode,
       connectNodes,
+      deleteEdges,
       savingLayout,
       error,
       clearError,
     }),
-    [createNode, createChoiceNode, updateNode, deleteNode, connectNodes, savingLayout, error, clearError],
+    [createNode, createChoiceNode, updateNode, deleteNode, connectNodes, deleteEdges, savingLayout, error, clearError],
   );
 }
