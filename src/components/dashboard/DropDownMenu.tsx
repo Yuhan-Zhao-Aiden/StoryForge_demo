@@ -23,7 +23,12 @@ type Story = {
   role?: "owner" | "editor" | "viewer";
 };
 
-export function StoryMenu({ room }: { room: Story }) {
+type StoryMenuProps = {
+  room: Story;
+  invitable?: boolean;
+};
+
+export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
   const { handleDeleteStory, loading: deleteLoading } = useDeleteRoom();
   const { handleLeaveRoom, loading: leaveLoading } = useLeaveRoom();
 
@@ -37,15 +42,17 @@ export function StoryMenu({ room }: { room: Story }) {
         <DropdownMenuLabel>My Story</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {/* Generate Invite available for all */}
-        <GenerateInvite
-          roomId={room._id}
-          trigger={
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              Generate Invite
-            </DropdownMenuItem>
-          }
-        />
+        {/* Generate Invite only when allowed */}
+        {invitable && (
+          <GenerateInvite
+            roomId={room._id}
+            trigger={
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                Generate Invite
+              </DropdownMenuItem>
+            }
+          />
+        )}
 
         {/* View Collaborators available for all */}
         <ViewCollaboratorsDialog
