@@ -16,7 +16,7 @@ export async function GET(
 
     const { roomId } = await params;
     const roomObjectId = new ObjectId(roomId);
-    const userObjectId = new ObjectId(user._id);
+    const userObjectId = new ObjectId(user.id);
     const db = await connectDB();
 
     const role = await getUserRoomRole(db, roomObjectId, userObjectId);
@@ -62,14 +62,14 @@ export async function POST(
 
     const { roomId } = await params;
     const db = await connectDB();
-    const role = await getUserRoomRole(db, new ObjectId(roomId), new ObjectId(user._id));
+    const role = await getUserRoomRole(db, new ObjectId(roomId), new ObjectId(user.id));
     if (!role) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     const body = await request.json();
     await db.collection("roomPresence").updateOne(
-      { roomId: new ObjectId(roomId), userId: new ObjectId(user._id) },
+      { roomId: new ObjectId(roomId), userId: new ObjectId(user.id) },
       { $set: { lastSeen: new Date(), cursor: body.cursor || null } },
       { upsert: true }
     );
@@ -95,7 +95,7 @@ export async function DELETE(
     const db = await connectDB();
     await db.collection("roomPresence").deleteOne({
       roomId: new ObjectId(roomId),
-      userId: new ObjectId(user._id),
+      userId: new ObjectId(user.id),
     });
 
     return NextResponse.json({ success: true });
