@@ -4,33 +4,25 @@ import { z } from "zod";
 
 import { requireRoomAccess, jsonError, jsonSuccess } from "@/lib/api/editor";
 import { getDb } from "@/lib/mongodb";
-import { createCommentSchema } from "@/lib/types/comments";
+import { updateCommentSchema } from "@/lib/types/comments";
 
-type CommentDocument = {
-  _id: ObjectId;
-  roomId: ObjectId;
-  nodeId: ObjectId;
-  parentId: ObjectId | null;
-  authorId: ObjectId;
-  content: string;
-  mentions: ObjectId[];
-  isPinned: boolean;
-  isResolved: boolean;
-  resolvedBy: ObjectId | null;
-  resolvedAt: Date | null;
-  createdAt: Date;
-  updatedAt: Date;
-};
+const createCommentSchema = z.object({
+  content: z.string().min(1),
+  parentId: z.string().nullable().optional(),
+  mentions: z.array(z.string()).optional().default([]),
+});
 
 type RouteContext = {
   params:
     | {
         roomId: string;
         nodeId: string;
+        commentId: string;
       }
     | Promise<{
         roomId: string;
         nodeId: string;
+        commentId: string;
       }>;
 };
 
@@ -39,97 +31,82 @@ async function getParamsFromContext(context: RouteContext) {
   return params;
 }
 
-// GET all comments for a node
-export async function GET(_req: NextRequest, context: RouteContext) {
-  const { roomId, nodeId } = await getParamsFromContext(context);
+export async function GET(
+  req: NextRequest,
+  context: { params: Promise<{ roomId: string; nodeId: string }> }
+) {
+  const { roomId, nodeId } = await context.params;
 
-  const access = await requireRoomAccess(roomId);
+  const access = await requireRoomAccess(roomId, { requireWrite: false });
   if (!access.ok) return access.response;
 
   const { db, roomId: roomObjectId } = access.context;
   const nodeObjectId = new ObjectId(nodeId);
 
-  // Get comments with author information
-  const comments = await db
-    .collection<CommentDocument>("comments")
-    .aggregate([
-      {
-        $match: {
-          roomId: roomObjectId,
-          nodeId: nodeObjectId,
-        },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "authorId",
-          foreignField: "_id",
-          as: "author",
-        },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "resolvedBy",
-          foreignField: "_id",
-          as: "resolvedByUser",
-        },
-      },
-      {
-        $unwind: {
-          path: "$author",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $unwind: {
-          path: "$resolvedByUser",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          roomId: 1,
-          nodeId: 1,
-          parentId: 1,
-          content: 1,
-          mentions: 1,
-          isPinned: 1,
-          isResolved: 1,
-          resolvedBy: 1,
-          resolvedAt: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          author: {
-            _id: 1,
-            username: 1,
-            email: 1,
-          },
-          resolvedByUser: {
-            _id: 1,
-            username: 1,
-            email: 1,
+  try {
+    const comments = await db
+      .collection("comments")
+      .aggregate([
+        { $match: { roomId: roomObjectId, nodeId: nodeObjectId } },
+        {
+          $lookup: {
+            from: "users",
+            localField: "authorId",
+            foreignField: "_id",
+            as: "author",
           },
         },
-      },
-      {
-        $sort: {
-          isPinned: -1,
-          createdAt: 1,
+        {
+          $lookup: {
+            from: "users",
+            localField: "resolvedBy",
+            foreignField: "_id",
+            as: "resolvedByUser",
+          },
         },
-      },
-    ])
-    .toArray();
+        { $unwind: { path: "$author", preserveNullAndEmptyArrays: true } },
+        {
+          $unwind: {
+            path: "$resolvedByUser",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        { $sort: { createdAt: 1 } },
+        {
+          $project: {
+            _id: 1,
+            roomId: 1,
+            nodeId: 1,
+            parentId: 1,
+            content: 1,
+            mentions: 1,
+            isPinned: 1,
+            isResolved: 1,
+            resolvedBy: 1,
+            resolvedAt: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            author: { _id: 1, username: 1, email: 1 },
+            resolvedByUser: { _id: 1, username: 1, email: 1 },
+          },
+        },
+      ])
+      .toArray();
 
-  return jsonSuccess({ comments });
+    return jsonSuccess({ comments });
+  } catch (error) {
+    console.error("Error fetching comments:", error);
+    return jsonError(500, "Failed to fetch comments");
+  }
 }
 
-// POST new comment
-export async function POST(req: NextRequest, context: RouteContext) {
-  const { roomId, nodeId } = await getParamsFromContext(context);
+export async function POST(
+  req: NextRequest,
+  context: { params: Promise<{ roomId: string; nodeId: string }> }
+) {
+  const { roomId, nodeId } = await context.params;
 
-  const access = await requireRoomAccess(roomId, { requireWrite: true });
+  const access = await requireRoomAccess(roomId, { requireWrite: false });
   if (!access.ok) return access.response;
 
   const { db, roomId: roomObjectId, userId } = access.context;
@@ -140,78 +117,79 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   let parsed;
   try {
-    parsed = createCommentSchema.parse({
-      ...body,
-      roomId: roomObjectId.toString(),
-      nodeId: nodeObjectId.toString(),
-    });
-  } catch {
-    return jsonError(400, "Invalid comment payload");
+    parsed = createCommentSchema.parse(body);
+  } catch (error) {
+    console.error("Validation error:", error);
+    return jsonError(400, "Invalid comment data");
   }
 
-  const now = new Date();
-  const commentDoc: CommentDocument = {
-    _id: new ObjectId(),
-    roomId: roomObjectId,
-    nodeId: nodeObjectId,
-    parentId: parsed.parentId ? new ObjectId(parsed.parentId) : null,
-    authorId: userId,
-    content: parsed.content,
-    mentions: parsed.mentions.map((id) => new ObjectId(id)),
-    isPinned: false,
-    isResolved: false,
-    resolvedBy: null,
-    resolvedAt: null,
-    createdAt: now,
-    updatedAt: now,
-  };
+  try {
+    const comment = {
+      _id: new ObjectId(),
+      roomId: roomObjectId,
+      nodeId: nodeObjectId,
+      parentId: parsed.parentId ? new ObjectId(parsed.parentId) : null,
+      content: parsed.content,
+      mentions: parsed.mentions.map((id: string) => new ObjectId(id)),
+      isPinned: false,
+      isResolved: false,
+      resolvedBy: null,
+      resolvedAt: null,
+      authorId: userId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
 
-  await db.collection("comments").insertOne(commentDoc);
+    await db.collection("comments").insertOne(comment);
 
-  // Fetch the created comment with author info
-  const createdComment = await db
-    .collection<CommentDocument>("comments")
-    .aggregate([
-      {
-        $match: { _id: commentDoc._id },
-      },
-      {
-        $lookup: {
-          from: "users",
-          localField: "authorId",
-          foreignField: "_id",
-          as: "author",
+    // Fetch the created comment with author info
+    const createdComment = await db
+      .collection("comments")
+      .aggregate([
+        {
+          $match: { _id: comment._id },
         },
-      },
-      {
-        $unwind: {
-          path: "$author",
-          preserveNullAndEmptyArrays: true,
-        },
-      },
-      {
-        $project: {
-          _id: 1,
-          roomId: 1,
-          nodeId: 1,
-          parentId: 1,
-          content: 1,
-          mentions: 1,
-          isPinned: 1,
-          isResolved: 1,
-          resolvedBy: 1,
-          resolvedAt: 1,
-          createdAt: 1,
-          updatedAt: 1,
-          author: {
-            _id: 1,
-            username: 1,
-            email: 1,
+        {
+          $lookup: {
+            from: "users",
+            localField: "authorId",
+            foreignField: "_id",
+            as: "author",
           },
         },
-      },
-    ])
-    .next();
+        {
+          $unwind: {
+            path: "$author",
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $project: {
+            _id: 1,
+            roomId: 1,
+            nodeId: 1,
+            parentId: 1,
+            content: 1,
+            mentions: 1,
+            isPinned: 1,
+            isResolved: 1,
+            resolvedBy: 1,
+            resolvedAt: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            author: {
+              _id: 1,
+              username: 1,
+              email: 1,
+            },
+          },
+        },
+      ])
+      .next();
 
-  return jsonSuccess({ comment: createdComment }, 201);
+    return jsonSuccess({ comment: createdComment });
+  } catch (error) {
+    console.error("Error creating comment:", error);
+    return jsonError(500, "Failed to create comment");
+  }
 }

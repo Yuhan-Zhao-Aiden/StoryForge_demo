@@ -25,11 +25,20 @@ async function getParamsFromContext(context: RouteContext) {
   return params;
 }
 
-// PATCH update comment
-export async function PATCH(req: NextRequest, context: RouteContext) {
-  const { roomId, nodeId, commentId } = await getParamsFromContext(context);
+type PatchContext = {
+  params: Promise<{ roomId: string; nodeId: string; commentId: string }>;
+};
 
-  const access = await requireRoomAccess(roomId, { requireWrite: true });
+// PATCH update comment
+export async function PATCH(
+  req: NextRequest,
+  context: {
+    params: Promise<{ roomId: string; nodeId: string; commentId: string }>;
+  }
+) {
+  const { roomId, nodeId, commentId } = await context.params;
+
+  const access = await requireRoomAccess(roomId, { requireWrite: false });
   if (!access.ok) return access.response;
 
   const { db, roomId: roomObjectId, userId } = access.context;
@@ -164,7 +173,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
 export async function DELETE(_req: NextRequest, context: RouteContext) {
   const { roomId, nodeId, commentId } = await getParamsFromContext(context);
 
-  const access = await requireRoomAccess(roomId, { requireWrite: true });
+  const access = await requireRoomAccess(roomId, { requireWrite: false });
   if (!access.ok) return access.response;
 
   const { db, roomId: roomObjectId, userId } = access.context;

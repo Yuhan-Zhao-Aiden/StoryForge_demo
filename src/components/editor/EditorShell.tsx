@@ -12,12 +12,16 @@ import {
   OnConnect,
   type NodeTypes,
 } from "@xyflow/react";
-
+import CommentsDrawer from "@/components/comments/CommentsDrawer";
 import "@xyflow/react/dist/style.css";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { useStoryGraphStore, type StoryFlowNode, type StoryFlowEdge } from "@/hooks/useStoryGraphStore";
+import {
+  useStoryGraphStore,
+  type StoryFlowNode,
+  type StoryFlowEdge,
+} from "@/hooks/useStoryGraphStore";
 import type { StoryEdge, StoryNode } from "@/lib/types/editor";
 import { Input } from "@/components/ui/input";
 import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
@@ -46,6 +50,16 @@ export function EditorShell({ room }: EditorShellProps) {
   const nodes = useStoryGraphStore((state) => state.nodes);
   const edges = useStoryGraphStore((state) => state.edges);
   const router = useRouter();
+
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((res) => res.json())
+      .then((data) => setCurrentUserId(data.user?.id))
+      .catch(() => setCurrentUserId(null));
+  }, []);
+
   const applyNodeChanges = useStoryGraphStore(
     (state) => state.applyNodeChanges
   );
@@ -175,7 +189,10 @@ export function EditorShell({ room }: EditorShellProps) {
       const hasNodes = nodeIdsSnapshot.length > 0;
       const hasEdges = edgeIdsSnapshot.length > 0;
 
-      if ((event.key === "Delete" || event.key === "Backspace") && (hasNodes || hasEdges)) {
+      if (
+        (event.key === "Delete" || event.key === "Backspace") &&
+        (hasNodes || hasEdges)
+      ) {
         event.preventDefault();
         void (async () => {
           await Promise.all(nodeIdsSnapshot.map((id) => deleteNode(id)));
@@ -187,7 +204,8 @@ export function EditorShell({ room }: EditorShellProps) {
       }
 
       const isDuplicateShortcut =
-        (event.key === "d" || event.key === "D") && (event.metaKey || event.ctrlKey);
+        (event.key === "d" || event.key === "D") &&
+        (event.metaKey || event.ctrlKey);
       if (isDuplicateShortcut && hasNodes) {
         event.preventDefault();
         const nodesToDuplicate = nodeIdsSnapshot
@@ -196,7 +214,9 @@ export function EditorShell({ room }: EditorShellProps) {
         void (async () => {
           for (const node of nodesToDuplicate) {
             await createNode({
-              title: node.data.title ? `${node.data.title} Copy` : "Untitled Copy",
+              title: node.data.title
+                ? `${node.data.title} Copy`
+                : "Untitled Copy",
               type: node.type as StoryNode["type"],
               color: node.data.color,
               position: {
@@ -240,7 +260,7 @@ export function EditorShell({ room }: EditorShellProps) {
     setNodeContent(selectedNode.data.content?.text ?? "");
     setNodeColor(selectedNode.data.color ?? "#2563eb");
     const existingImage = selectedNode.data.content?.media?.find(
-      (media) => media.type === "image",
+      (media) => media.type === "image"
     );
     setImageUrl(existingImage?.url ?? "");
   }, [selectedNode]);
@@ -263,7 +283,7 @@ export function EditorShell({ room }: EditorShellProps) {
         text: nodeContent,
         media: [
           ...(selectedNode.data.content?.media?.filter(
-            (media) => media.type !== "image",
+            (media) => media.type !== "image"
           ) ?? []),
           ...(imageUrl
             ? [
@@ -277,7 +297,15 @@ export function EditorShell({ room }: EditorShellProps) {
         ],
       },
     });
-  }, [selectedNode, canEdit, nodeTitle, nodeColor, nodeContent, imageUrl, updateNode]);
+  }, [
+    selectedNode,
+    canEdit,
+    nodeTitle,
+    nodeColor,
+    nodeContent,
+    imageUrl,
+    updateNode,
+  ]);
 
   const handleDeleteNode = useCallback(() => {
     if (!selectedNode || !canEdit) return;
@@ -297,14 +325,14 @@ export function EditorShell({ room }: EditorShellProps) {
             ) : null}
           </div>
           <div className="flex items-center gap-3">
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className={`uppercase ${
-                room.role === "owner" 
-                  ? "border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" 
-                  : room.role === "editor" 
-                    ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                    : "border-gray-500 bg-gray-500/10 text-gray-600 dark:text-gray-400"
+                room.role === "owner"
+                  ? "border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                  : room.role === "editor"
+                  ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  : "border-gray-500 bg-gray-500/10 text-gray-600 dark:text-gray-400"
               }`}
             >
               {room.role === "owner" && "👑 "}
@@ -317,7 +345,12 @@ export function EditorShell({ room }: EditorShellProps) {
                 Read-only
               </Badge>
             )}
-            <Button type="button" size="sm" className="uppercase" disabled={!canEdit}>
+            <Button
+              type="button"
+              size="sm"
+              className="uppercase"
+              disabled={!canEdit}
+            >
               Save draft
             </Button>
           </div>
@@ -382,8 +415,12 @@ export function EditorShell({ room }: EditorShellProps) {
                 className="bg-background"
               >
                 <MiniMap
-                  nodeColor={(node) => node.data?.color as string ?? "#2563eb"}
-                  nodeStrokeColor={(node) => node.data?.color as string ?? "#2563eb"}
+                  nodeColor={(node) =>
+                    (node.data?.color as string) ?? "#2563eb"
+                  }
+                  nodeStrokeColor={(node) =>
+                    (node.data?.color as string) ?? "#2563eb"
+                  }
                   nodeBorderRadius={6}
                 />
                 <Controls position="top-right" />
@@ -406,7 +443,7 @@ export function EditorShell({ room }: EditorShellProps) {
               ) : null}
               {!loading && !error && nodes.length === 0 ? (
                 <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-md border border-dashed border-border bg-background/90 p-4 text-center text-sm text-muted-foreground">
-                  {canEdit 
+                  {canEdit
                     ? "No nodes yet — use the toolbar to start building your story."
                     : "This story has no content yet. You have view-only access."}
                 </div>
@@ -472,18 +509,12 @@ export function EditorShell({ room }: EditorShellProps) {
                       Save Changes
                     </Button>
                     <div className="flex gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          router.push(
-                            `/rooms/${room.id}/editor/nodes/${selectedNode.id}/comments`
-                          );
-                        }}
-                      >
-                        Comments
-                      </Button>
+                      <CommentsDrawer
+                        room={room}
+                        node={selectedNode}
+                        userRole={room.role}
+                        currentUserId={currentUserId}
+                      />
                       <Button
                         type="button"
                         size="sm"
