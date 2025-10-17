@@ -202,13 +202,11 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   return jsonSuccess({ success: true });
 }
 
-// GET comments for a node
 export async function GET(
   req: NextRequest,
-  context: { params: { roomId: string; nodeId: string } }
+  context: { params: Promise<{ roomId: string; nodeId: string }> }
 ) {
-  const params = await Promise.resolve(context.params);
-  const { roomId, nodeId } = params;
+  const { roomId, nodeId } = await context.params;
 
   const access = await requireRoomAccess(roomId, { requireWrite: false });
   if (!access.ok) return access.response;
@@ -220,12 +218,7 @@ export async function GET(
     const comments = await db
       .collection("comments")
       .aggregate([
-        {
-          $match: {
-            roomId: roomObjectId,
-            nodeId: nodeObjectId,
-          },
-        },
+        { $match: { roomId: roomObjectId, nodeId: nodeObjectId } },
         {
           $lookup: {
             from: "users",
@@ -242,21 +235,14 @@ export async function GET(
             as: "resolvedByUser",
           },
         },
-        {
-          $unwind: {
-            path: "$author",
-            preserveNullAndEmptyArrays: true,
-          },
-        },
+        { $unwind: { path: "$author", preserveNullAndEmptyArrays: true } },
         {
           $unwind: {
             path: "$resolvedByUser",
             preserveNullAndEmptyArrays: true,
           },
         },
-        {
-          $sort: { createdAt: 1 },
-        },
+        { $sort: { createdAt: 1 } },
         {
           $project: {
             _id: 1,
@@ -271,16 +257,8 @@ export async function GET(
             resolvedAt: 1,
             createdAt: 1,
             updatedAt: 1,
-            author: {
-              _id: 1,
-              username: 1,
-              email: 1,
-            },
-            resolvedByUser: {
-              _id: 1,
-              username: 1,
-              email: 1,
-            },
+            author: { _id: 1, username: 1, email: 1 },
+            resolvedByUser: { _id: 1, username: 1, email: 1 },
           },
         },
       ])
@@ -300,7 +278,7 @@ export async function POST(
   const params = await Promise.resolve(context.params);
   const { roomId, nodeId } = params;
 
-  const access = await requireRoomAccess(roomId, { requireWrite: false }); 
+  const access = await requireRoomAccess(roomId, { requireWrite: false });
   if (!access.ok) return access.response;
 
   const { db, roomId: roomObjectId, userId } = access.context;
