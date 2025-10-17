@@ -22,7 +22,7 @@ type CommentsDrawerProps = {
     type?: string;
   };
   userRole: "owner" | "editor" | "viewer";
-  currentUserId: string;
+  currentUserId: string | null;
 };
 
 export default function CommentsDrawer({
@@ -53,9 +53,9 @@ export default function CommentsDrawer({
         <div className="p-4">
           <CommentsSection
             room={room}
-            node={node}
+            node={{ ...node, type: node.type || "default" }}
             userRole={userRole}
-            currentUserId={currentUserId}
+            currentUserId={currentUserId ?? ""}
           />
         </div>
       </SheetContent>

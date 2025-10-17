@@ -325,14 +325,14 @@ export function EditorShell({ room }: EditorShellProps) {
             ) : null}
           </div>
           <div className="flex items-center gap-3">
-            <Badge 
-              variant="outline" 
+            <Badge
+              variant="outline"
               className={`uppercase ${
-                room.role === "owner" 
-                  ? "border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" 
-                  : room.role === "editor" 
-                    ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
-                    : "border-gray-500 bg-gray-500/10 text-gray-600 dark:text-gray-400"
+                room.role === "owner"
+                  ? "border-yellow-500 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400"
+                  : room.role === "editor"
+                  ? "border-blue-500 bg-blue-500/10 text-blue-600 dark:text-blue-400"
+                  : "border-gray-500 bg-gray-500/10 text-gray-600 dark:text-gray-400"
               }`}
             >
               {room.role === "owner" && "👑 "}
@@ -345,7 +345,12 @@ export function EditorShell({ room }: EditorShellProps) {
                 Read-only
               </Badge>
             )}
-            <Button type="button" size="sm" className="uppercase" disabled={!canEdit}>
+            <Button
+              type="button"
+              size="sm"
+              className="uppercase"
+              disabled={!canEdit}
+            >
               Save draft
             </Button>
           </div>
@@ -438,7 +443,7 @@ export function EditorShell({ room }: EditorShellProps) {
               ) : null}
               {!loading && !error && nodes.length === 0 ? (
                 <div className="pointer-events-none absolute inset-x-4 bottom-4 rounded-md border border-dashed border-border bg-background/90 p-4 text-center text-sm text-muted-foreground">
-                  {canEdit 
+                  {canEdit
                     ? "No nodes yet — use the toolbar to start building your story."
                     : "This story has no content yet. You have view-only access."}
                 </div>

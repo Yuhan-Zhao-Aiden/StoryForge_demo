@@ -25,9 +25,18 @@ async function getParamsFromContext(context: RouteContext) {
   return params;
 }
 
+type PatchContext = {
+  params: Promise<{ roomId: string; nodeId: string; commentId: string }>;
+};
+
 // PATCH update comment
-export async function PATCH(req: NextRequest, context: RouteContext) {
-  const { roomId, nodeId, commentId } = await getParamsFromContext(context);
+export async function PATCH(
+  req: NextRequest,
+  context: {
+    params: Promise<{ roomId: string; nodeId: string; commentId: string }>;
+  }
+) {
+  const { roomId, nodeId, commentId } = await context.params;
 
   const access = await requireRoomAccess(roomId, { requireWrite: false });
   if (!access.ok) return access.response;
