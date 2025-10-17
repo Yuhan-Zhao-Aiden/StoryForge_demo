@@ -11,6 +11,8 @@ import {
 import { GenerateInvite } from "./GenerateInvite";
 import { EditStoryDialog } from "@/app/dashboard/_components/StoryForm";
 import { ViewCollaboratorsDialog } from "./ViewCollaboratorsDialog"; 
+import { ManageCollaborators } from "./ManageCollaborators";
+import { ActivityLog } from "./ActivityLog";
 import { useDeleteRoom } from "@/hooks/useDeleteRoom";
 import { useLeaveRoom } from "@/hooks/useLeaveRoom"; 
 
@@ -23,31 +25,35 @@ type Story = {
   role?: "owner" | "editor" | "viewer";
 };
 
-export function StoryMenu({ room }: { room: Story }) {
+type StoryMenuProps = {
+  room: Story;
+  invitable?: boolean;
+};
+
+export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
   const { handleDeleteStory, loading: deleteLoading } = useDeleteRoom();
   const { handleLeaveRoom, loading: leaveLoading } = useLeaveRoom();
 
-
-  const isOwner = room.role === "owner";
+  const isOwner = !room.role || room.role === "owner";
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger>•••</DropdownMenuTrigger>
       <DropdownMenuContent className="min-w-[200px]">
-        <DropdownMenuLabel>My Story</DropdownMenuLabel>
+        <DropdownMenuLabel>{isOwner ? "My Story" : "Story Actions"}</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {/* Generate Invite available for all */}
-        <GenerateInvite
-          roomId={room._id}
-          trigger={
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-              Generate Invite
-            </DropdownMenuItem>
-          }
-        />
+        {invitable && (
+          <GenerateInvite
+            roomId={room._id}
+            trigger={
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                Generate Invite
+              </DropdownMenuItem>
+            }
+          />
+        )}
 
-        {/* View Collaborators available for all */}
         <ViewCollaboratorsDialog
           roomId={room._id}
           trigger={
@@ -57,9 +63,18 @@ export function StoryMenu({ room }: { room: Story }) {
           }
         />
 
-        {/* Owner-specific options */}
+        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+          <ActivityLog roomId={room._id} />
+        </DropdownMenuItem>
+
         {isOwner && (
           <>
+            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+              <ManageCollaborators 
+                roomId={room._id} 
+                currentUserRole={room.role || "owner"} 
+              />
+            </DropdownMenuItem>
             <EditStoryDialog
               roomId={room._id}
               initialTitle={room.title}
@@ -70,7 +85,22 @@ export function StoryMenu({ room }: { room: Story }) {
                 </DropdownMenuItem>
               }
             />
-            <DropdownMenuItem>Export</DropdownMenuItem>
+          </>
+        )}
+
+        {room.role === "editor" && (
+          <EditStoryDialog
+            roomId={room._id}
+            initialTitle={room.title}
+            initialSubtitle={room.subtitle}
+            trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Edit Details</DropdownMenuItem>}
+          />
+        )}
+        
+        <DropdownMenuItem>Export</DropdownMenuItem>
+
+        {isOwner && (
+          <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="bg-red-500 focus:bg-red-700"
@@ -82,15 +112,17 @@ export function StoryMenu({ room }: { room: Story }) {
           </>
         )}
 
-        {/* Collaborator-specific option */}
         {!isOwner && (
-          <DropdownMenuItem
-            className="bg-red-500 focus:bg-red-700"
-            onClick={() => handleLeaveRoom(room._id)}
-            disabled={leaveLoading}
-          >
-            {leaveLoading ? "Leaving..." : "Leave Room"}
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="bg-red-500 focus:bg-red-700"
+              onClick={() => handleLeaveRoom(room._id)}
+              disabled={leaveLoading}
+            >
+              {leaveLoading ? "Leaving..." : "Leave Room"}
+            </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
