@@ -96,8 +96,10 @@ function toFlowNode(node: StoryNode): StoryFlowNode {
     type: node.type,
     data,
     style: {
-      border: "none",
-      background: "transparent",
+      borderWidth: 0,
+      borderStyle: "solid",
+      borderColor: "transparent",
+      backgroundColor: "transparent",
       padding: 0,
       width: 224,
     },
