@@ -68,10 +68,19 @@ export async function PATCH(
 
   const updateData: any = { updatedAt: new Date() };
 
+  // Track if mentions are being updated to create notifications
+  let newMentions: string[] = [];
+  let oldMentions: string[] = [];
+
   // Only author can update content and mentions
   if (existingComment.authorId.toString() === userId.toString()) {
     if (parsed.content !== undefined) updateData.content = parsed.content;
     if (parsed.mentions !== undefined) {
+      // Get old mentions for comparison
+      oldMentions =
+        existingComment.mentions?.map((id: ObjectId) => id.toString()) || [];
+      newMentions = parsed.mentions;
+
       updateData.mentions = parsed.mentions.map((id) => new ObjectId(id));
     }
   }
@@ -101,6 +110,52 @@ export async function PATCH(
     },
     { $set: updateData }
   );
+
+  // NEW: Create notifications for NEW mentions when comment is edited
+  if (newMentions.length > 0 && parsed.mentions !== undefined) {
+    // Find mentions that are new (not in old mentions)
+    const newMentionedUserIds = newMentions.filter(
+      (mentionId) =>
+        !oldMentions.includes(mentionId) && mentionId !== userId.toString()
+    );
+
+    if (newMentionedUserIds.length > 0) {
+      // Get room and node details for the notification
+      const room = await db.collection("rooms").findOne({ _id: roomObjectId });
+      const node = await db.collection("nodes").findOne({ _id: nodeObjectId });
+
+      // Get comment author details
+      const commentAuthor = await db
+        .collection("users")
+        .findOne({ _id: userId });
+
+      for (const mentionedUserId of newMentionedUserIds) {
+        await db.collection("notifications").insertOne({
+          userId: new ObjectId(mentionedUserId),
+          type: "mention",
+          title: "You were mentioned in a comment",
+          message: `${
+            commentAuthor?.username || commentAuthor?.email || "Someone"
+          } mentioned you in a comment in "${room?.title || "Unknown Room"}"`,
+          relatedEntity: {
+            type: "comment",
+            id: commentObjectId.toString(),
+            roomId: roomId,
+            nodeId: nodeId,
+            commentId: commentObjectId.toString(),
+          },
+          read: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          triggeredBy: {
+            userId: userId.toString(),
+            username: commentAuthor?.username || "",
+            email: commentAuthor?.email || "",
+          },
+        });
+      }
+    }
+  }
 
   // Fetch updated comment with author info
   const updatedComment = await db

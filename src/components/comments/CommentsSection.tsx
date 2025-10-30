@@ -6,6 +6,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { useSearchParams } from "next/navigation";
 import {
   MoreHorizontal,
   MessageSquare,
@@ -62,6 +63,7 @@ type MentionState = {
   selectedIndex: number;
   query: string;
   startIndex: number;
+  textareaId?: string;
 };
 
 export default function CommentsSection({
@@ -74,14 +76,21 @@ export default function CommentsSection({
   const [comments, setComments] = useState<Comment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyContents, setReplyContents] = useState<Record<string, string>>(
+    {}
+  );
   const [editingComment, setEditingComment] = useState<string | null>(null);
   const [editContent, setEditContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [sortOption, setSortOption] = useState<"newest" | "oldest">("newest");
   const [error, setError] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const commentId = searchParams.get("commentId");
 
-  // Mention states
+  const highlightedCommentsRef = useRef<Set<string>>(new Set());
+  const hasProcessedInitialHighlightRef = useRef(false);
+
   const [mentionState, setMentionState] = useState<MentionState>({
     show: false,
     position: { top: 0, left: 0 },
@@ -119,6 +128,57 @@ export default function CommentsSection({
   useEffect(() => {
     fetchComments();
   }, [fetchComments]);
+  useEffect(() => {
+    if (
+      commentId &&
+      comments.length > 0 &&
+      !hasProcessedInitialHighlightRef.current
+    ) {
+      hasProcessedInitialHighlightRef.current = true;
+
+      const timer = setTimeout(() => {
+        const commentElement = document.getElementById(`comment-${commentId}`);
+        if (commentElement && !highlightedCommentsRef.current.has(commentId)) {
+          // Mark this comment as highlighted
+          highlightedCommentsRef.current.add(commentId);
+
+          // Scroll to the comment
+          commentElement.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+          });
+
+          // Add highlight styles
+          commentElement.classList.add(
+            "border-l-[3px]",
+            "border-amber-400",
+            "bg-amber-50",
+            "dark:bg-amber-950/20",
+            "transition-all",
+            "duration-500"
+          );
+
+          // Remove highlight after 5 seconds
+          setTimeout(() => {
+            commentElement.classList.remove(
+              "border-l-[3px]",
+              "border-amber-400",
+              "bg-amber-50",
+              "dark:bg-amber-950/20"
+            );
+          }, 5000);
+        }
+      }, 500);
+
+      return () => clearTimeout(timer);
+    }
+  }, [commentId, comments]);
+
+  useEffect(() => {
+    return () => {
+      hasProcessedInitialHighlightRef.current = false;
+    };
+  }, [commentId]);
 
   const searchUsers = useCallback(
     async (query: string) => {
@@ -149,14 +209,20 @@ export default function CommentsSection({
 
   const handleTextChange = (
     e: React.ChangeEvent<HTMLTextAreaElement>,
-    isEdit: boolean = false
+    isEdit: boolean = false,
+    textareaId?: string
   ) => {
     const value = e.target.value;
 
     if (isEdit) {
       setEditContent(value);
-    } else {
+    } else if (textareaId === "main") {
       setNewComment(value);
+    } else if (textareaId) {
+      setReplyContents((prev) => ({
+        ...prev,
+        [textareaId]: value,
+      }));
     }
 
     // Check for @ mention
@@ -164,68 +230,74 @@ export default function CommentsSection({
     const textBeforeCursor = value.substring(0, cursorPosition);
     const lastAtIndex = textBeforeCursor.lastIndexOf("@");
 
+    // FIXED: Check if there's a space after the @ symbol
     if (lastAtIndex !== -1) {
       const textAfterAt = textBeforeCursor.substring(lastAtIndex + 1);
+
+      // NEW: Check if there's a space in the text after @
       const spaceIndex = textAfterAt.indexOf(" ");
 
-      if (spaceIndex === -1 || spaceIndex > 0) {
-        const query =
-          spaceIndex === -1
-            ? textAfterAt
-            : textAfterAt.substring(0, spaceIndex);
-
-        const textarea = e.target;
-        const textBefore = textBeforeCursor.substring(0, lastAtIndex);
-        const tempDiv = document.createElement("div");
-        tempDiv.style.cssText = `
-          position: absolute;
-          white-space: pre-wrap;
-          word-wrap: break-word;
-          visibility: hidden;
-          font: getComputedStyle(textarea).font;
-          width: ${textarea.offsetWidth}px;
-        `;
-        tempDiv.textContent = textBefore;
-        document.body.appendChild(tempDiv);
-
-        const top =
-          textarea.offsetTop +
-          (tempDiv.offsetHeight %
-            parseInt(getComputedStyle(textarea).lineHeight));
-        const left = textarea.offsetLeft + tempDiv.offsetWidth;
-
-        document.body.removeChild(tempDiv);
-
-        setMentionState((prev) => ({
-          ...prev,
-          show: true,
-          position: { top, left },
-          query,
-          startIndex: lastAtIndex,
-        }));
-
-        searchUsers(query);
+      // If space is found, hide the mention dropdown
+      if (spaceIndex !== -1) {
+        setMentionState((prev) => ({ ...prev, show: false }));
         return;
       }
+
+      // Only proceed if there's no space after @
+      const query = textAfterAt;
+
+      const textarea = e.target;
+      const rect = textarea.getBoundingClientRect();
+
+      const top = rect.bottom + window.scrollY;
+      const left = rect.left + window.scrollX;
+
+      setMentionState((prev) => ({
+        ...prev,
+        show: true,
+        position: { top, left },
+        query,
+        startIndex: lastAtIndex,
+        textareaId: textareaId || (isEdit ? "edit" : "main"),
+      }));
+
+      searchUsers(query);
+      return;
     }
 
     setMentionState((prev) => ({ ...prev, show: false }));
   };
 
-  // Insert mention into text
-  const insertMention = (user: User, isEdit: boolean = false) => {
+  const insertMention = (
+    user: User,
+    isEdit: boolean = false,
+    textareaId?: string
+  ) => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const currentText = isEdit ? editContent : newComment;
+    let currentText = "";
+    if (isEdit) {
+      currentText = editContent;
+    } else if (textareaId === "main") {
+      currentText = newComment;
+    } else if (textareaId) {
+      currentText = replyContents[textareaId] || "";
+    }
+
     const textBeforeMention = currentText.substring(0, mentionState.startIndex);
     const textAfterMention = currentText.substring(textarea.selectionStart);
     const newText = `${textBeforeMention}@${user.username} ${textAfterMention}`;
 
     if (isEdit) {
       setEditContent(newText);
-    } else {
+    } else if (textareaId === "main") {
       setNewComment(newText);
+    } else if (textareaId) {
+      setReplyContents((prev) => ({
+        ...prev,
+        [textareaId]: newText,
+      }));
     }
 
     setMentionState((prev) => ({ ...prev, show: false }));
@@ -241,7 +313,8 @@ export default function CommentsSection({
 
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLTextAreaElement>,
-    isEdit: boolean = false
+    isEdit: boolean = false,
+    textareaId?: string
   ) => {
     if (mentionState.show) {
       switch (e.key) {
@@ -269,7 +342,8 @@ export default function CommentsSection({
           if (mentionState.users[mentionState.selectedIndex]) {
             insertMention(
               mentionState.users[mentionState.selectedIndex],
-              isEdit
+              isEdit,
+              textareaId
             );
           }
           break;
@@ -284,9 +358,37 @@ export default function CommentsSection({
           if (mentionState.users[mentionState.selectedIndex]) {
             insertMention(
               mentionState.users[mentionState.selectedIndex],
-              isEdit
+              isEdit,
+              textareaId
             );
           }
+          break;
+
+        case " ":
+          e.preventDefault();
+          setMentionState((prev) => ({ ...prev, show: false }));
+
+          const textarea = e.currentTarget;
+          const start = textarea.selectionStart;
+          const end = textarea.selectionEnd;
+          const value = textarea.value;
+          const newValue =
+            value.substring(0, start) + " " + value.substring(end);
+
+          if (isEdit) {
+            setEditContent(newValue);
+          } else if (textareaId === "main") {
+            setNewComment(newValue);
+          } else if (textareaId) {
+            setReplyContents((prev) => ({
+              ...prev,
+              [textareaId]: newValue,
+            }));
+          }
+
+          setTimeout(() => {
+            textarea.selectionStart = textarea.selectionEnd = start + 1;
+          }, 0);
           break;
       }
     }
@@ -307,6 +409,7 @@ export default function CommentsSection({
 
     return mentions;
   };
+
   const handleSubmitComment = async (parentId: string | null = null) => {
     if (!newComment.trim() || submitting) return;
 
@@ -314,16 +417,6 @@ export default function CommentsSection({
     setError(null);
     try {
       const mentions = parseMentions(newComment);
-
-      console.log(
-        "Submitting comment to:",
-        `/api/rooms/${room.id}/nodes/${node.id}/comments`
-      );
-      console.log("Data being sent:", {
-        content: newComment,
-        parentId,
-        mentions,
-      });
 
       const response = await fetch(
         `/api/rooms/${room.id}/nodes/${node.id}/comments`,
@@ -338,23 +431,9 @@ export default function CommentsSection({
         }
       );
 
-      console.log("Response status:", response.status);
-
       if (!response.ok) {
-        let errorMessage = "Failed to post comment";
-        try {
-          const errorData = await response.json();
-          errorMessage = errorData.message || errorMessage;
-          console.error("Error response data:", errorData);
-        } catch (parseError) {
-          console.error("Failed to parse error response:", parseError);
-          errorMessage = `${response.status} ${response.statusText}`;
-        }
-        throw new Error(errorMessage);
+        throw new Error("Failed to post comment");
       }
-
-      const result = await response.json();
-      console.log("Success response:", result);
 
       setNewComment("");
       setReplyingTo(null);
@@ -362,13 +441,54 @@ export default function CommentsSection({
       await fetchComments();
     } catch (error) {
       console.error("Error posting comment:", error);
-      setError(
-        error instanceof Error ? error.message : "Failed to post comment"
-      );
+      setError("Failed to post comment");
     } finally {
       setSubmitting(false);
     }
   };
+
+  const handleSubmitReply = async (parentId: string) => {
+    const replyContent = replyContents[parentId];
+    if (!replyContent?.trim() || submitting) return;
+
+    setSubmitting(true);
+    setError(null);
+    try {
+      const mentions = parseMentions(replyContent);
+
+      const response = await fetch(
+        `/api/rooms/${room.id}/nodes/${node.id}/comments`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            content: replyContent,
+            parentId,
+            mentions,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Failed to post reply");
+      }
+
+      setReplyContents((prev) => {
+        const newContents = { ...prev };
+        delete newContents[parentId];
+        return newContents;
+      });
+      setReplyingTo(null);
+      setMentionState((prev) => ({ ...prev, show: false }));
+      await fetchComments();
+    } catch (error) {
+      console.error("Error posting reply:", error);
+      setError("Failed to post reply");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const handleUpdateComment = async (commentId: string) => {
     if (!editContent.trim()) return;
 
@@ -536,7 +656,6 @@ export default function CommentsSection({
 
   return (
     <div className="p-4 flex flex-col gap-6 w-full bg-background">
-      {/* Error Display */}
       {error && (
         <div className="bg-destructive/15 text-destructive p-3 rounded-md text-sm">
           {error}
@@ -549,7 +668,6 @@ export default function CommentsSection({
         </div>
       )}
 
-      {/* Sort bar */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">{comments.length} Comments</h2>
         <select
@@ -562,7 +680,6 @@ export default function CommentsSection({
         </select>
       </div>
 
-      {/* Add comment box - Show for everyone */}
       <div className="flex gap-3 items-start">
         <Avatar className="w-10 h-10">
           <AvatarFallback>
@@ -573,19 +690,18 @@ export default function CommentsSection({
           <Textarea
             ref={textareaRef}
             value={newComment}
-            onChange={(e) => handleTextChange(e, false)}
-            onKeyDown={(e) => handleKeyDown(e, false)}
+            onChange={(e) => handleTextChange(e, false, "main")}
+            onKeyDown={(e) => handleKeyDown(e, false, "main")}
             placeholder="Add a comment... Use @ to mention someone"
             className="resize-none min-h-[80px] text-sm"
           />
 
-          {/* Mention Dropdown */}
-          {mentionState.show && (
+          {mentionState.show && mentionState.textareaId === "main" && (
             <div
               ref={mentionListRef}
-              className="absolute z-50 w-64 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-lg"
+              className="fixed z-50 w-64 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-lg"
               style={{
-                top: `${mentionState.position.top + 20}px`,
+                top: `${mentionState.position.top}px`,
                 left: `${mentionState.position.left}px`,
               }}
             >
@@ -595,7 +711,7 @@ export default function CommentsSection({
                   className={`p-2 cursor-pointer hover:bg-accent ${
                     index === mentionState.selectedIndex ? "bg-accent" : ""
                   }`}
-                  onClick={() => insertMention(user, false)}
+                  onClick={() => insertMention(user, false, "main")}
                 >
                   <div className="flex items-center gap-2">
                     <Avatar className="h-6 w-6">
@@ -649,7 +765,6 @@ export default function CommentsSection({
         </div>
       </div>
 
-      {/* Comments list */}
       <div className="flex flex-col gap-6 mt-4">
         {topLevelComments.length === 0 ? (
           <div className="text-center text-muted-foreground py-8">
@@ -677,9 +792,9 @@ export default function CommentsSection({
               editContent={editContent}
               setEditContent={setEditContent}
               replyingTo={replyingTo}
-              newComment={newComment}
-              setNewComment={setNewComment}
-              onSubmitReply={handleSubmitComment}
+              replyContents={replyContents}
+              setReplyContents={setReplyContents}
+              onSubmitReply={handleSubmitReply}
               canComment={canComment}
               isRoomOwner={isRoomOwner}
               submitting={submitting}
@@ -714,8 +829,8 @@ interface CommentItemProps {
   editContent: string;
   setEditContent: (content: string) => void;
   replyingTo: string | null;
-  newComment: string;
-  setNewComment: (content: string) => void;
+  replyContents: Record<string, string>;
+  setReplyContents: (contents: Record<string, string>) => void;
   onSubmitReply: (parentId: string) => void;
   canComment: boolean;
   isRoomOwner: boolean;
@@ -724,13 +839,15 @@ interface CommentItemProps {
   setEditingComment: (commentId: string | null) => void;
   handleTextChange: (
     e: React.ChangeEvent<HTMLTextAreaElement>,
-    isEdit: boolean
+    isEdit: boolean,
+    textareaId?: string
   ) => void;
   handleKeyDown: (
     e: React.KeyboardEvent<HTMLTextAreaElement>,
-    isEdit: boolean
+    isEdit: boolean,
+    textareaId?: string
   ) => void;
-  insertMention: (user: User, isEdit: boolean) => void;
+  insertMention: (user: User, isEdit: boolean, textareaId?: string) => void;
   mentionState: MentionState;
   searchUsers: (query: string) => void;
   renderContentWithMentions: (content: string) => React.ReactNode;
@@ -751,8 +868,8 @@ function CommentItem({
   editContent,
   setEditContent,
   replyingTo,
-  newComment,
-  setNewComment,
+  replyContents,
+  setReplyContents,
   onSubmitReply,
   canComment,
   isRoomOwner,
@@ -771,9 +888,11 @@ function CommentItem({
   const mentionListRef = useRef<HTMLDivElement>(null);
 
   const showDropdown = isCommentAuthor || isRoomOwner;
+  const replyContent = replyContents[comment._id] || "";
 
   return (
     <div
+      id={`comment-${comment._id}`}
       className={`flex gap-3 ${
         comment.isPinned ? "border-l-4 border-yellow-400 pl-3" : ""
       }`}
@@ -810,7 +929,6 @@ function CommentItem({
             </p>
           </div>
 
-          {/* Dropdown Menu - Only show if user has permissions */}
           {showDropdown && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -819,7 +937,6 @@ function CommentItem({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {/* Pin/Unpin - Only for room owners */}
                 {isRoomOwner && (
                   <DropdownMenuItem
                     onClick={() => onPin(comment._id, !comment.isPinned)}
@@ -829,7 +946,6 @@ function CommentItem({
                   </DropdownMenuItem>
                 )}
 
-                {/* Resolve/Unresolve - Only for room owners */}
                 {isRoomOwner && (
                   <DropdownMenuItem
                     onClick={() => onResolve(comment._id, !comment.isResolved)}
@@ -848,7 +964,6 @@ function CommentItem({
                   </DropdownMenuItem>
                 )}
 
-                {/* Edit - Only for comment author */}
                 {(isCommentAuthor || isRoomOwner) && (
                   <DropdownMenuItem onClick={() => onEdit(comment)}>
                     <Pencil className="w-4 h-4 mr-2" />
@@ -856,7 +971,6 @@ function CommentItem({
                   </DropdownMenuItem>
                 )}
 
-                {/* Delete - Only for comment author */}
                 {(isCommentAuthor || isRoomOwner) && (
                   <DropdownMenuItem
                     onClick={() => onDelete(comment._id)}
@@ -871,25 +985,23 @@ function CommentItem({
           )}
         </div>
 
-        {/* Comment Content */}
         {editingComment === comment._id ? (
           <div className="mt-2">
             <div className="relative">
               <Textarea
                 ref={textareaRef}
                 value={editContent}
-                onChange={(e) => handleTextChange(e, true)}
-                onKeyDown={(e) => handleKeyDown(e, true)}
+                onChange={(e) => handleTextChange(e, true, "edit")}
+                onKeyDown={(e) => handleKeyDown(e, true, "edit")}
                 className="min-h-[60px] text-sm mb-2"
               />
 
-              {/* Mention Dropdown for Edit */}
-              {mentionState.show && (
+              {mentionState.show && mentionState.textareaId === "edit" && (
                 <div
                   ref={mentionListRef}
-                  className="absolute z-50 w-64 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-lg"
+                  className="fixed z-50 w-64 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-lg"
                   style={{
-                    top: `${mentionState.position.top + 20}px`,
+                    top: `${mentionState.position.top}px`,
                     left: `${mentionState.position.left}px`,
                   }}
                 >
@@ -899,7 +1011,7 @@ function CommentItem({
                       className={`p-2 cursor-pointer hover:bg-accent ${
                         index === mentionState.selectedIndex ? "bg-accent" : ""
                       }`}
-                      onClick={() => insertMention(user, true)}
+                      onClick={() => insertMention(user, true, "edit")}
                     >
                       <div className="flex items-center gap-2">
                         <Avatar className="h-6 w-6">
@@ -953,7 +1065,6 @@ function CommentItem({
           </p>
         )}
 
-        {/* Comment Actions - Show for everyone (all roles can reply) */}
         <div className="flex gap-4 mt-2 text-xs text-muted-foreground">
           <button
             onClick={() => onReply(comment._id)}
@@ -965,22 +1076,67 @@ function CommentItem({
           </button>
         </div>
 
-        {/* Reply Form */}
         {replyingTo === comment._id && (
           <div className="mt-3 ml-8">
             <div className="relative">
               <Textarea
                 placeholder="Write a reply..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
+                value={replyContent}
+                onChange={(e) => handleTextChange(e, false, comment._id)}
+                onKeyDown={(e) => handleKeyDown(e, false, comment._id)}
                 className="min-h-[60px] text-sm mb-2"
               />
+
+              {mentionState.show && mentionState.textareaId === comment._id && (
+                <div
+                  ref={mentionListRef}
+                  className="fixed z-50 w-64 max-h-48 overflow-y-auto bg-popover border border-border rounded-md shadow-lg"
+                  style={{
+                    top: `${mentionState.position.top}px`,
+                    left: `${mentionState.position.left}px`,
+                  }}
+                >
+                  {mentionState.users.map((user, index) => (
+                    <div
+                      key={user._id}
+                      className={`p-2 cursor-pointer hover:bg-accent ${
+                        index === mentionState.selectedIndex ? "bg-accent" : ""
+                      }`}
+                      onClick={() => insertMention(user, false, comment._id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">
+                            {user.username?.[0]?.toUpperCase() ||
+                              user.email?.[0]?.toUpperCase() ||
+                              "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="text-sm font-medium">
+                            {user.username || "Unknown"}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {user.email}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {mentionState.users.length === 0 && (
+                    <div className="p-2 text-sm text-muted-foreground">
+                      No users found
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
             <div className="flex space-x-2">
               <Button
                 size="sm"
                 onClick={() => onSubmitReply(comment._id)}
-                disabled={!newComment.trim() || submitting}
+                disabled={!replyContent.trim() || submitting}
               >
                 <Send className="w-4 h-4 mr-1" />
                 {submitting ? "Posting..." : "Reply"}
@@ -988,7 +1144,12 @@ function CommentItem({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setReplyingTo(null)}
+                onClick={() => {
+                  setReplyingTo(null);
+                  const newContents = { ...replyContents };
+                  delete newContents[comment._id];
+                  setReplyContents(newContents);
+                }}
               >
                 Cancel
               </Button>
@@ -996,7 +1157,6 @@ function CommentItem({
           </div>
         )}
 
-        {/* Replies */}
         <div className="ml-8 mt-3 flex flex-col gap-3">
           {replies.map((reply) => (
             <CommentItem
@@ -1015,8 +1175,8 @@ function CommentItem({
               editContent={editContent}
               setEditContent={setEditContent}
               replyingTo={replyingTo}
-              newComment={newComment}
-              setNewComment={setNewComment}
+              replyContents={replyContents}
+              setReplyContents={setReplyContents}
               onSubmitReply={onSubmitReply}
               canComment={canComment}
               isRoomOwner={isRoomOwner}
