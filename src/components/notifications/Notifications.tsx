@@ -65,7 +65,6 @@ export function Notifications() {
       fetchNotifications();
     }
   }, [isOpen]);
-
   const markAsRead = async (notificationId: string) => {
     if (processedNotificationsRef.current.has(notificationId)) {
       return true;
@@ -77,19 +76,30 @@ export function Notifications() {
       const response = await fetch(`/api/notifications/${notificationId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ read: true }),
+        body: JSON.stringify({ read: true }), // ✅ This is correct
       });
 
       if (response.ok) {
+        const result = await response.json();
+
+        // Update the notifications state
         setNotifications((prev) =>
           prev.map((notif) =>
             notif._id === notificationId ? { ...notif, read: true } : notif
           )
         );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
+
+        // Update the unread count from the API response
+        setUnreadCount(result.totalUnread || 0);
+
         return true;
       } else {
-        console.error("Failed to mark notification as read:", response.status);
+        const errorData = await response.json();
+        console.error(
+          "Failed to mark notification as read:",
+          response.status,
+          errorData
+        );
         processedNotificationsRef.current.delete(notificationId);
         return false;
       }

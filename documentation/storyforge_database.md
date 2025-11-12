@@ -9,11 +9,12 @@ for **users**, **rooms**, **roomMembers**, **nodes**, and **edges**.
 
 -   **Database:** MongoDB (Atlas or self-hosted)
 -   **Database name:** `storyforge`
--   **Collections:** `users`, `rooms`, `roomMembers`, `nodes`, `edges`, `roomInvites`
+-   **Collections:** `users`, `rooms`, `roomMembers`, `nodes`, `edges`, `roomInvites`, `node_images.files`, `node_images.chunks`
 -   **ID type:** `ObjectId` (stored as strings in API responses)
 -   **Validation:** JSON Schema validators with
     `validationLevel: "moderate"`
 -   **Indexes:** Created for uniqueness and query performance
+-   **File Storage:** GridFS for uploaded images (bucket: `node_images`)
 
 ------------------------------------------------------------------------
 
@@ -115,12 +116,38 @@ flag
   _id: ObjectId,
   roomId: ObjectId,                  // FK to rooms._id
   title: String,
+  type: "scene" | "choice" | "ending" | "note",
+  color: String,                     // Hex color code (e.g., "#2563eb")
   content: {
     text: String | null,
-    media: Array | null              // e.g. [{ type, url }]
+    summary: String | null,
+    media: [                         // Array of media items
+      // Legacy URL-based media (backward compatible)
+      {
+        id: String (UUID),
+        type: "image" | "audio" | "video" | "link" | "other",
+        source: "url",
+        url: String,
+        caption: String | null
+      },
+      // OR GridFS-uploaded media (new)
+      {
+        id: String (UUID),
+        type: "image" | "audio" | "video" | "link" | "other",
+        source: "uploaded",
+        fileId: String,              // ObjectId of file in node_images.files
+        filename: String,
+        contentType: String,         // MIME type
+        size: Number | null,
+        uploadedBy: String | null,   // User ObjectId
+        uploadedAt: Date | null,
+        caption: String | null
+      }
+    ]
   },
   position: { x: Number, y: Number },
   labels: [String],
+  collapsed: Boolean,
   createdBy: ObjectId,               // FK to users._id
   createdAt: Date,
   updatedAt: Date
@@ -128,6 +155,12 @@ flag
 ```
 
 **Indexes** - `{ roomId, createdAt }` - `{ roomId, title }`
+
+**Notes:**
+- The `media` array supports both legacy URL-based media and new GridFS-uploaded files
+- Use `source: "url"` for external images (legacy nodes)
+- Use `source: "uploaded"` for images stored in GridFS
+- The `fileId` field references `node_images.files._id`
 
 ------------------------------------------------------------------------
 
@@ -150,8 +183,86 @@ flag
 
 ------------------------------------------------------------------------
 
+## Node Images Collection (GridFS)
 
-- **Collection**: `roomInvites`
+StoryForge uses **GridFS** to store images uploaded for story nodes. GridFS automatically creates two collections:
+
+### node_images.files
+
+Stores metadata about each uploaded image file.
+
+**Schema:**
+``` js
+{
+  _id: ObjectId,                     // Auto-generated file ID
+  length: Number,                    // File size in bytes
+  chunkSize: Number,                 // Chunk size (default 255KB)
+  uploadDate: Date,                  // When the file was uploaded
+  filename: String,                  // Original filename
+  metadata: {                        // Custom metadata
+    roomId: String,                  // ObjectId as string
+    nodeId: String,                  // ObjectId as string
+    uploadedBy: String,              // User ObjectId as string
+    uploadedAt: Date,                // Upload timestamp
+    contentType: String,             // MIME type (e.g., "image/jpeg")
+    originalFilename: String,        // Original uploaded filename
+    size: Number                     // File size in bytes
+  }
+}
+```
+
+**Indexes:**
+- `{ filename: 1, uploadDate: 1 }` (auto-created by GridFS)
+- `{ "metadata.roomId": 1, "metadata.uploadedAt": -1 }` (custom - for room queries)
+- `{ "metadata.nodeId": 1 }` (custom - for node cleanup)
+
+**Example document:**
+``` json
+{
+  "_id": { "$oid": "650000000000000000000xyz" },
+  "length": 2456789,
+  "chunkSize": 261120,
+  "uploadDate": { "$date": "2025-11-12T10:30:00Z" },
+  "filename": "lighthouse-scene.jpg",
+  "metadata": {
+    "roomId": "650000000000000000000001",
+    "nodeId": "650000000000000000000abc",
+    "uploadedBy": "68d3a82e20ade5c1bdd49c06",
+    "uploadedAt": { "$date": "2025-11-12T10:30:00Z" },
+    "contentType": "image/jpeg",
+    "originalFilename": "lighthouse-scene.jpg",
+    "size": 2456789
+  }
+}
+```
+
+### node_images.chunks
+
+Stores the actual binary data of files, split into chunks (default 255KB each).
+
+**Schema:**
+``` js
+{
+  _id: ObjectId,                     // Auto-generated chunk ID
+  files_id: ObjectId,                // FK to node_images.files._id
+  n: Number,                         // Chunk sequence number (0-indexed)
+  data: Binary                       // Binary chunk data
+}
+```
+
+**Indexes:**
+- `{ files_id: 1, n: 1 }` unique (auto-created by GridFS)
+
+**Notes:**
+- GridFS automatically manages chunking and reassembly
+- Images are stored with 10MB max size limit (configurable)
+- Supported formats: JPEG, PNG, GIF, WebP, SVG
+- Cleanup: When a node is deleted, associated images should be removed via `deleteNodeImages()`
+- Legacy nodes may still reference external URLs in their `content.media` array
+
+------------------------------------------------------------------------
+
+## RoomInvites Collection
 - **Purpose**: Store hashed invite codes for joining rooms without altering `rooms`.
 
 ### Required fields
@@ -195,7 +306,10 @@ flag
 -   **RoomMembers**: links users ↔ rooms with roles
 -   **Nodes**: story content blocks within a room
 -   **Edges**: directional links between nodes
+-   **RoomInvites**: invite codes for room access
+-   **node_images.files** & **node_images.chunks**: GridFS collections for uploaded images
 
 This schema supports **collaborative storyboarding**, showing both owned
 and collaborating rooms in the user dashboard, with nodes and edges
-forming interactive story graphs.
+forming interactive story graphs. Images can be stored directly in MongoDB
+via GridFS or referenced externally via URLs (legacy support).
