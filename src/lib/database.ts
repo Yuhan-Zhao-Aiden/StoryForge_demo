@@ -4,7 +4,7 @@ let mongoClient: MongoClient
 let database: Db
 
 export async function connectDB(): Promise<Db> {
-  if (!mongoClient) {
+  if (!mongoClient || !database) {
     const connectionString = process.env.DATABASE_URL
     
     if (!connectionString) {

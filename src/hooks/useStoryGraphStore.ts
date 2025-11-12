@@ -90,15 +90,18 @@ function toFlowNode(node: StoryNode): StoryFlowNode {
   if (!data.color) {
     data.color = color;
   }
-  const background = color.length === 7 ? `${color}20` : color;
   return {
     id: node.id,
     position: { ...node.position },
     type: node.type,
     data,
     style: {
-      borderColor: color,
-      backgroundColor: background,
+      borderWidth: 0,
+      borderStyle: "solid",
+      borderColor: "transparent",
+      backgroundColor: "transparent",
+      padding: 0,
+      width: 224,
     },
   };
 }

@@ -1,10 +1,15 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 
 import { getDb } from "@/lib/mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { generateInviteCode, hashInviteCode } from "@/lib/invites";
+import { getUserRoomRole, hasPermission } from "@/lib/permissions";
+
+type RouteContext = {
+  params: { roomId: string } | Promise<{ roomId: string }>;
+};
 
 const bodySchema = z.object({
   role: z.enum(["editor", "viewer"]).default("viewer"),
@@ -12,15 +17,17 @@ const bodySchema = z.object({
   expiresAt: z.string().datetime().nullable().optional(),      // ISO string or null
 });
 
-export async function POST(
-  req: Request,
-  { params }: { params: { roomId: string } }
-) {
+async function getRoomIdFromContext(context: RouteContext) {
+  const params = await Promise.resolve(context.params);
+  return params.roomId;
+}
+
+export async function POST(req: NextRequest, context: RouteContext) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const db = await getDb();
-  const { roomId } = await params;
+  const roomId = await getRoomIdFromContext(context);
   const roomObjId = new ObjectId(roomId);
 
   let parsed: z.infer<typeof bodySchema>;
@@ -29,16 +36,18 @@ export async function POST(
   } catch (e: any) {
     return NextResponse.json({ error: e?.errors ?? "Invalid body" }, { status: 400 });
   }
-
-  // Permission: only owner (adjust if editors can create invites)
+  const userIdObj = new ObjectId(user.id);
+  const userRole = await getUserRoomRole(db, roomObjId, userIdObj);
+  
+  if (!userRole || !hasPermission(userRole, "INVITE_COLLABORATORS")) {
+    return NextResponse.json({ error: "Forbidden - Only room owners can create invites" }, { status: 403 });
+  }
+  
   const room = await db.collection("rooms").findOne(
     { _id: roomObjId },
     { projection: { ownerId: 1 } }
   );
   if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
-  if (room.ownerId?.toString() !== user.id) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  }
 
   const code = generateInviteCode(10);
   const codeHash = hashInviteCode(code);

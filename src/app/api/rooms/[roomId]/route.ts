@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { connectDB } from "@/lib/database";     
-import { getCurrentUser } from "@/lib/auth";   
+import { getCurrentUser } from "@/lib/auth";
+import { getUserRoomRole, hasPermission } from "@/lib/permissions";
+import { deleteRoomImages } from "@/lib/gridfs";   
 
 type Params = { roomId: string };
 
@@ -29,8 +31,11 @@ export async function DELETE(_req: Request, ctx: { params: Promise<Params> }) {
     const edges = db.collection("edges");
     const roomMembers = db.collection("roomMembers");
     const roomInvites = db.collection("roomInvites");
-
-    // 4) Ownership check
+    const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
+    if (!userRole || !hasPermission(userRole, "DELETE_ROOM")) {
+      return NextResponse.json({ error: "Forbidden - Only room owners can delete rooms" }, { status: 403 });
+    }
+    
     const room = await rooms.findOne(
       { _id: roomIdObj },
       { projection: { _id: 1, ownerId: 1 } }
@@ -38,16 +43,17 @@ export async function DELETE(_req: Request, ctx: { params: Promise<Params> }) {
     if (!room) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
-    if (!room.ownerId || room.ownerId.toString() !== userIdObj.toString()) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
 
 
-    const [nodesDel, edgesDel, membersDel, invitesDel] = await Promise.all([
+    const [nodesDel, edgesDel, membersDel, invitesDel, imagesDel] = await Promise.all([
       nodes.deleteMany({ roomId: roomIdObj }),
       edges.deleteMany({ roomId: roomIdObj }),
       roomMembers.deleteMany({ roomId: roomIdObj }),
       roomInvites.deleteMany({ roomId: roomIdObj }),
+      deleteRoomImages(roomId).catch((error) => {
+        console.error(`Failed to delete images for room ${roomId}:`, error);
+        return 0; // Continue even if image deletion fails
+      }),
     ]);
 
     const roomDel = await rooms.deleteOne({ _id: roomIdObj });
@@ -63,6 +69,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<Params> }) {
         edges: edgesDel.deletedCount ?? 0,
         members: membersDel.deletedCount ?? 0,
         invites: invitesDel.deletedCount ?? 0,
+        images: imagesDel,
         rooms: roomDel.deletedCount ?? 0,
       },
     });
@@ -111,15 +118,16 @@ export async function PATCH(req: Request, ctx: { params: Promise<Params> }) {
 
     const roomIdObj = new ObjectId(roomId);
     const userIdObj = new ObjectId(user.id);
+    const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
+    if (!userRole || !hasPermission(userRole, "UPDATE_ROOM")) {
+      return NextResponse.json({ error: "Forbidden - Insufficient permissions to update room" }, { status: 403 });
+    }
 
     const room = await rooms.findOne(
       { _id: roomIdObj },
       { projection: { _id: 1, ownerId: 1 } }
     );
     if (!room) return NextResponse.json({ error: "Room not found" }, { status: 404 });
-    if (!room.ownerId || room.ownerId.toString() !== userIdObj.toString()) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
 
     const $set: Record<string, unknown> = {};
     if (title !== undefined) $set.title = title;

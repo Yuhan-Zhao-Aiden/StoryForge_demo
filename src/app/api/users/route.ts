@@ -17,6 +17,7 @@ async function checkAuth(req: NextRequest) {
         }
       }
     }
+    console.log("replying 301")
     return { ok: false, code: 401, message: "Missing bypass secret" }
   }
   return { ok: false, code: 401, message: "Auth not ready" }

@@ -11,6 +11,7 @@ import {
   NodeUpdate,
   objectIdSchema,
 } from "@/lib/types/editor";
+import { deleteNodeImages } from "@/lib/gridfs";
 
 type NodeDocument = {
   _id: ObjectId;
@@ -253,16 +254,28 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
   const nodesCollection = db.collection("nodes");
   const edgesCollection = db.collection("edges");
 
-  const [nodesResult, edgesResult] = await Promise.all([
+  // Delete associated GridFS images for each node
+  const imageCleanupPromises = parsed.ids.map((nodeId) => 
+    deleteNodeImages(nodeId).catch((error) => {
+      console.error(`Failed to delete images for node ${nodeId}:`, error);
+      return 0; // Continue even if image deletion fails
+    })
+  );
+
+  const [nodesResult, edgesResult, imageCounts] = await Promise.all([
     nodesCollection.deleteMany({ _id: { $in: ids }, roomId: roomObjectId }),
     edgesCollection.deleteMany({
       roomId: roomObjectId,
       $or: [{ fromNodeId: { $in: ids } }, { toNodeId: { $in: ids } }],
     }),
+    Promise.all(imageCleanupPromises),
   ]);
+
+  const totalImagesDeleted = imageCounts.reduce((sum, count) => sum + count, 0);
 
   return jsonSuccess({
     deletedNodes: nodesResult.deletedCount ?? 0,
     deletedEdges: edgesResult.deletedCount ?? 0,
+    deletedImages: totalImagesDeleted,
   });
 }
