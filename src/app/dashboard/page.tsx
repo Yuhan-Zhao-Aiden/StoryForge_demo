@@ -19,11 +19,11 @@ import { ObjectId } from "mongodb";
 import { NewStoryDialog } from "./_components/StoryForm";
 import { RedeemInvite } from "./_components/RedeemInvite";
 import { ActivityChart } from "@/components/dashboard/ActivityChart";
-
+import { Notifications } from "@/components/notifications/Notifications";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-// Types (keep Story consistent with StoryRow) 
+// Types (keep Story consistent with StoryRow)
 type Story = {
   _id: string;
   title: string;
@@ -44,16 +44,23 @@ type RoomDoc = {
   updatedAt?: Date;
 };
 
-// Helpers 
+// Helpers
 function formatDateISO(d?: Date) {
   if (!d) return "—";
-  return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  return d.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 function roomToStory(r: RoomDoc, role: Story["role"]): Story {
   const status: Story["status"] =
-    r.visibility === "public" ? "Published" :
-    r.visibility === "unlisted" ? "Draft" : "Active";
+    r.visibility === "public"
+      ? "Published"
+      : r.visibility === "unlisted"
+      ? "Draft"
+      : "Active";
 
   return {
     _id: String(r._id),
@@ -66,7 +73,7 @@ function roomToStory(r: RoomDoc, role: Story["role"]): Story {
   };
 }
 
-// Data loader (server) 
+// Data loader (server)
 async function loadData() {
   const me = await getCurrentUser();
   if (!me) redirect("/login");
@@ -77,18 +84,29 @@ async function loadData() {
   let userId: ObjectId | null = null;
   if (me.id && ObjectId.isValid(me.id)) userId = new ObjectId(me.id);
   if (!userId && me.email) {
-    const u = await db.collection("users").findOne<{ _id: ObjectId }>({ email: me.email }, { projection: { _id: 1 } });
+    const u = await db
+      .collection("users")
+      .findOne<{ _id: ObjectId }>(
+        { email: me.email },
+        { projection: { _id: 1 } }
+      );
     if (u?._id) userId = u._id;
   }
   if (!userId) throw new Error("User not found");
 
   // Owned rooms
-  const ownedRooms: RoomDoc[] = await db
+  const ownedRooms: RoomDoc[] = (await db
     .collection<RoomDoc>("rooms")
     .find({ ownerId: userId })
-    .project({ title: 1, subtitle: 1, collaborators: 1, visibility: 1, updatedAt: 1 })
+    .project({
+      title: 1,
+      subtitle: 1,
+      collaborators: 1,
+      visibility: 1,
+      updatedAt: 1,
+    })
     .sort({ updatedAt: -1 })
-    .toArray() as RoomDoc[];
+    .toArray()) as RoomDoc[];
 
   // Collaborations (exclude owner)
   const memberships = await db
@@ -100,11 +118,17 @@ async function loadData() {
   const collabIds = memberships.map((m: any) => m.roomId as ObjectId);
   let collabRooms: RoomDoc[] = [];
   if (collabIds.length) {
-    collabRooms = await db
+    collabRooms = (await db
       .collection<RoomDoc>("rooms")
       .find({ _id: { $in: collabIds } })
-      .project({ title: 1, subtitle: 1, collaborators: 1, visibility: 1, updatedAt: 1 })
-      .toArray() as RoomDoc[];
+      .project({
+        title: 1,
+        subtitle: 1,
+        collaborators: 1,
+        visibility: 1,
+        updatedAt: 1,
+      })
+      .toArray()) as RoomDoc[];
   }
 
   // Build collaborating list aligned to memberships order
@@ -117,7 +141,9 @@ async function loadData() {
       const membershipRole = m.role === "editor" ? "editor" : "viewer";
       return { room, role: membershipRole as Story["role"] };
     })
-    .filter((value): value is { room: RoomDoc; role: Story["role"] } => !!value);
+    .filter(
+      (value): value is { room: RoomDoc; role: Story["role"] } => !!value
+    );
 
   // If any room is missing `collaborators`, compute from roomMembers (count - 1 owner)
   const missingIds = [
@@ -134,16 +160,26 @@ async function loadData() {
         { $group: { _id: "$roomId", count: { $sum: 1 } } },
       ])
       .toArray();
-    const countMap = new Map<string, number>(counts.map((c) => [String(c._id), Math.max(0, c.count - 1)]));
-    ownedRooms.forEach((r) => { if (r.collaborators == null) r.collaborators = countMap.get(String(r._id)) ?? 0; });
+    const countMap = new Map<string, number>(
+      counts.map((c) => [String(c._id), Math.max(0, c.count - 1)])
+    );
+    ownedRooms.forEach((r) => {
+      if (r.collaborators == null)
+        r.collaborators = countMap.get(String(r._id)) ?? 0;
+    });
     collaboratingRooms.forEach(({ room }) => {
-      if (room.collaborators == null) room.collaborators = countMap.get(String(room._id)) ?? 0;
+      if (room.collaborators == null)
+        room.collaborators = countMap.get(String(room._id)) ?? 0;
     });
   }
 
   // Normalize to Story[]
-  const ownedStories: Story[] = ownedRooms.map((room) => roomToStory(room, "owner"));
-  const collabStories: Story[] = collaboratingRooms.map(({ room, role }) => roomToStory(room, role));
+  const ownedStories: Story[] = ownedRooms.map((room) =>
+    roomToStory(room, "owner")
+  );
+  const collabStories: Story[] = collaboratingRooms.map(({ room, role }) =>
+    roomToStory(room, role)
+  );
 
   return {
     user: { username: (me as any).username ?? null, email: me.email },
@@ -152,7 +188,7 @@ async function loadData() {
   };
 }
 
-// Page (server component) 
+// Page (server component)
 export default async function DashboardPage() {
   const { user, ownedStories, collabStories } = await loadData();
   const totalStories = ownedStories.length + collabStories.length;
@@ -172,15 +208,27 @@ export default async function DashboardPage() {
         <div className="flex items-center gap-3">
           {/* <Button variant="secondary">Join Session</Button> */}
           {/* <Button>+ Create New Story</Button> */}
-          <RedeemInvite trigger={<Button variant="secondary">Join Session</Button>} />
+          {/* ADD NOTIFICATIONS BUTTON HERE */}
+          <Notifications />
+          <RedeemInvite
+            trigger={<Button variant="secondary">Join Session</Button>}
+          />
           <NewStoryDialog />
         </div>
       </div>
 
       {/* Stats row */}
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Total Stories" value={totalStories} icon={<FaBook />} />
-        <StatCard label="Active Sessions" value={totalStories} icon={<VscVmActive />} />
+        <StatCard
+          label="Total Stories"
+          value={totalStories}
+          icon={<FaBook />}
+        />
+        <StatCard
+          label="Active Sessions"
+          value={totalStories}
+          icon={<VscVmActive />}
+        />
         <StatCard label="Collaborators" value={10} icon={<FaUserGroup />} />
         <StatCard label="This month" value={24} icon={<FaChartLine />} />
       </div>
@@ -190,7 +238,9 @@ export default async function DashboardPage() {
         {/* Owned (2/3 width) */}
         <Card className="lg:col-span-2 border-muted/60">
           <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base">Recent Stories — Your Stories</CardTitle>
+            <CardTitle className="text-base">
+              Recent Stories — Your Stories
+            </CardTitle>
             <Link
               href="#"
               className="text-sm text-muted-foreground underline underline-offset-4 hover:text-foreground"
@@ -200,11 +250,13 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             {ownedStories.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No owned stories yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No owned stories yet.
+              </p>
             ) : (
               <ul className="space-y-3">
-                { ownedStories.map((s) => (
-                  <StoryRow key={s._id} s={s} invitable={true}/>
+                {ownedStories.map((s) => (
+                  <StoryRow key={s._id} s={s} invitable={true} />
                 ))}
               </ul>
             )}
@@ -214,15 +266,19 @@ export default async function DashboardPage() {
         {/* Collaborating */}
         <Card className="border-muted/60">
           <CardHeader>
-            <CardTitle className="text-base">Recent Stories — Collaborating</CardTitle>
+            <CardTitle className="text-base">
+              Recent Stories — Collaborating
+            </CardTitle>
           </CardHeader>
           <CardContent>
             {collabStories.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No collaborations yet.</p>
+              <p className="text-sm text-muted-foreground">
+                No collaborations yet.
+              </p>
             ) : (
               <ul className="space-y-3">
                 {collabStories.map((s) => (
-                  <StoryRow key={s._id} s={s} invitable={false}/>
+                  <StoryRow key={s._id} s={s} invitable={false} />
                 ))}
               </ul>
             )}

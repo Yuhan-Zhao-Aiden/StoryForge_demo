@@ -99,7 +99,6 @@ export async function GET(
     return jsonError(500, "Failed to fetch comments");
   }
 }
-
 export async function POST(
   req: NextRequest,
   context: { params: Promise<{ roomId: string; nodeId: string }> }
@@ -141,6 +140,122 @@ export async function POST(
     };
 
     await db.collection("comments").insertOne(comment);
+
+    // ========== NOTIFICATION CREATION WITH ERROR HANDLING ==========
+    console.log("=== NOTIFICATION DEBUGGING ===");
+    console.log("Received mentions array:", parsed.mentions);
+    console.log("Current user ID:", userId.toString());
+    console.log("Comment content:", parsed.content);
+
+    try {
+      if (parsed.mentions && parsed.mentions.length > 0) {
+        const mentionedUserIds = parsed.mentions.filter(
+          (mentionId) => mentionId !== userId.toString()
+        );
+
+        console.log("After filtering self-mentions:", mentionedUserIds);
+
+        if (mentionedUserIds.length > 0) {
+          // Get room and node details for the notification
+          const room = await db
+            .collection("rooms")
+            .findOne({ _id: roomObjectId });
+          const node = await db
+            .collection("nodes")
+            .findOne({ _id: nodeObjectId });
+
+          console.log("Room found:", !!room);
+          console.log("Node found:", !!node);
+
+          // Get comment author details
+          const commentAuthor = await db
+            .collection("users")
+            .findOne({ _id: userId });
+
+          console.log("Comment author found:", !!commentAuthor);
+          console.log(`Creating ${mentionedUserIds.length} notifications`);
+
+          let notificationCount = 0;
+          for (const mentionedUserId of mentionedUserIds) {
+            try {
+              console.log("Creating notification for user:", mentionedUserId);
+
+              // Verify the mentioned user exists
+              const mentionedUser = await db
+                .collection("users")
+                .findOne({ _id: new ObjectId(mentionedUserId) });
+
+              if (!mentionedUser) {
+                console.log("❌ Mentioned user not found:", mentionedUserId);
+                continue;
+              }
+
+              console.log(
+                "Mentioned user exists:",
+                mentionedUser.username || mentionedUser.email
+              );
+
+              const notification = {
+                userId: new ObjectId(mentionedUserId),
+                type: "mention",
+                title: "You were mentioned in a comment",
+                message: `${
+                  commentAuthor?.username || commentAuthor?.email || "Someone"
+                } mentioned you in a comment in "${
+                  room?.title || "Unknown Room"
+                }"`,
+                relatedEntity: {
+                  type: "comment",
+                  id: comment._id.toString(),
+                  roomId: roomId,
+                  nodeId: nodeId,
+                  commentId: comment._id.toString(),
+                },
+                read: false,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                triggeredBy: {
+                  userId: userId.toString(),
+                  username: commentAuthor?.username || "",
+                  email: commentAuthor?.email || "",
+                },
+              };
+
+              const result = await db
+                .collection("notifications")
+                .insertOne(notification);
+              console.log(
+                "✅ Notification created with ID:",
+                result.insertedId
+              );
+              notificationCount++;
+            } catch (userError) {
+              console.error(
+                "❌ Error creating notification for user:",
+                mentionedUserId,
+                userError
+              );
+            }
+          }
+
+          console.log(
+            `🎉 Successfully created ${notificationCount} out of ${mentionedUserIds.length} notifications`
+          );
+        } else {
+          console.log("💡 No users to notify (only self-mentions)");
+        }
+      } else {
+        console.log("💡 No mentions in the comment");
+      }
+    } catch (notificationError) {
+      console.error(
+        "❌ Error in notification creation process:",
+        notificationError
+      );
+    }
+
+    console.log("=== END NOTIFICATION DEBUGGING ===");
+    // ========== END NOTIFICATION CREATION ==========
 
     // Fetch the created comment with author info
     const createdComment = await db
