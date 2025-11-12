@@ -8,11 +8,25 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { id } = await context.params; 
-
+    const { id } = await context.params;
     const currentUser = await getCurrentUser();
+
     if (!currentUser) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    if (!ObjectId.isValid(id)) {
+      return NextResponse.json(
+        { error: "Invalid notification ID format" },
+        { status: 400 }
+      );
+    }
+
+    if (!ObjectId.isValid(currentUser.id)) {
+      return NextResponse.json(
+        { error: "Invalid user ID format" },
+        { status: 400 }
+      );
     }
 
     const { read } = await request.json();
@@ -20,8 +34,8 @@ export async function PATCH(
 
     const result = await db.collection("notifications").updateOne(
       {
-        _id: new ObjectId(id), // ✅ use extracted id
-        userId: currentUser.id,
+        _id: new ObjectId(id),
+        userId: new ObjectId(currentUser.id),
       },
       {
         $set: {
@@ -38,9 +52,10 @@ export async function PATCH(
       );
     }
 
-    const totalUnread = await db
-      .collection("notifications")
-      .countDocuments({ userId: currentUser.id, read: false }); // ✅ also fixed logical bug — unread = false
+    const totalUnread = await db.collection("notifications").countDocuments({
+      userId: new ObjectId(currentUser.id),
+      read: false,
+    });
 
     return NextResponse.json({
       success: true,
