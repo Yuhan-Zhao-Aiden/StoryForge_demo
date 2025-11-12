@@ -78,6 +78,18 @@ export const mediaItemSchema = z.preprocess((val) => {
   uploadedMediaItemSchema,
 ]));
 
+// Timestamp schema for dates
+const timestampSchema = z
+  .union([z.date(), z.string(), z.number()])
+  .transform((value) => {
+    if (value instanceof Date) return value;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error("Invalid date value");
+    }
+    return date;
+  });
+
 export const nodeContentSchema = z.object({
   text: z
     .string()
@@ -90,6 +102,9 @@ export const nodeContentSchema = z.object({
     .optional()
     .transform((value) => (value === "" ? undefined : value)),
   media: z.array(mediaItemSchema).default([]),
+  generatedBy: z.enum(["user", "ai"]).default("user"),
+  generatedAt: timestampSchema.optional(),
+  generationPrompt: z.string().optional(),
 });
 
 // Type exports for media items
@@ -101,17 +116,6 @@ export type NodeContent = z.infer<typeof nodeContentSchema>;
 // ------------------------------------------------------------
 // Node schema
 // ------------------------------------------------------------
-
-const timestampSchema = z
-  .union([z.date(), z.string(), z.number()])
-  .transform((value) => {
-    if (value instanceof Date) return value;
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error("Invalid date value");
-    }
-    return date;
-  });
 
 export const storyNodeSchema = z.object({
   id: z.string().min(1),
@@ -190,6 +194,43 @@ export const edgeUpdateSchema = z.object({
 });
 
 export type EdgeUpdate = z.infer<typeof edgeUpdateSchema>;
+
+// ------------------------------------------------------------
+// AI Content Generation schemas
+// ------------------------------------------------------------
+
+export const contentGenerationRequestSchema = z.object({
+  roomId: objectIdSchema,
+  nodeId: z.string().min(1),
+  prompt: z.string().min(1, "Prompt is required").max(2000, "Prompt too long"),
+  nodeType: nodeTypeSchema.optional(),
+  currentContent: z.string().optional(),
+  contextNodes: z.array(z.object({
+    title: z.string(),
+    content: z.string(),
+    type: nodeTypeSchema,
+  })).optional(),
+  options: z.object({
+    temperature: z.number().min(0).max(2).default(0.7),
+    maxTokens: z.number().int().positive().max(4000).default(1000),
+    tone: z.enum(["casual", "formal", "dramatic", "humorous", "descriptive"]).optional(),
+  }).optional(),
+});
+
+export const contentGenerationResponseSchema = z.object({
+  success: z.boolean(),
+  content: z.string().optional(),
+  error: z.string().optional(),
+  usage: z.object({
+    promptTokens: z.number().int(),
+    completionTokens: z.number().int(),
+    totalTokens: z.number().int(),
+  }).optional(),
+  generatedAt: z.date(),
+});
+
+export type ContentGenerationRequest = z.infer<typeof contentGenerationRequestSchema>;
+export type ContentGenerationResponse = z.infer<typeof contentGenerationResponseSchema>;
 
 // ------------------------------------------------------------
 // Batch payloads & editor state
