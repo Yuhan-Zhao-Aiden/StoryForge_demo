@@ -35,12 +35,48 @@ export const viewportSchema = z.object({
 // Node content schema
 // ------------------------------------------------------------
 
-export const mediaItemSchema = z.object({
+// Legacy media item with URL
+export const urlMediaItemSchema = z.object({
   id: z.string().uuid(),
   type: z.enum(["image", "audio", "video", "link", "other"]).default("other"),
+  source: z.literal("url"),
   url: z.string().url("Media item must include a valid URL"),
   caption: z.string().optional(),
 });
+
+// GridFS-uploaded media item
+export const uploadedMediaItemSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["image", "audio", "video", "link", "other"]).default("image"),
+  source: z.literal("uploaded"),
+  fileId: z.string().regex(/^[0-9a-fA-F]{24}$/, "Expected a 24 character hex ObjectId"),
+  filename: z.string().min(1),
+  contentType: z.string().min(1),
+  size: z.number().int().positive().optional(),
+  uploadedBy: objectIdSchema.optional(),
+  uploadedAt: z.union([z.date(), z.string(), z.number()]).transform((value) => {
+    if (value instanceof Date) return value;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error("Invalid date value");
+    }
+    return date;
+  }).optional(),
+  caption: z.string().optional(),
+});
+
+// Union type supporting both legacy URLs and uploaded files
+// Preprocessor handles legacy media items without a source field
+export const mediaItemSchema = z.preprocess((val) => {
+  // If the value is an object without a source field but has a url, default to "url"
+  if (typeof val === "object" && val !== null && "url" in val && !("source" in val)) {
+    return { ...val, source: "url" };
+  }
+  return val;
+}, z.discriminatedUnion("source", [
+  urlMediaItemSchema,
+  uploadedMediaItemSchema,
+]));
 
 export const nodeContentSchema = z.object({
   text: z
@@ -55,6 +91,12 @@ export const nodeContentSchema = z.object({
     .transform((value) => (value === "" ? undefined : value)),
   media: z.array(mediaItemSchema).default([]),
 });
+
+// Type exports for media items
+export type UrlMediaItem = z.infer<typeof urlMediaItemSchema>;
+export type UploadedMediaItem = z.infer<typeof uploadedMediaItemSchema>;
+export type MediaItem = z.infer<typeof mediaItemSchema>;
+export type NodeContent = z.infer<typeof nodeContentSchema>;
 
 // ------------------------------------------------------------
 // Node schema

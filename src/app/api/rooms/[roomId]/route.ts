@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { connectDB } from "@/lib/database";     
 import { getCurrentUser } from "@/lib/auth";
-import { getUserRoomRole, hasPermission } from "@/lib/permissions";   
+import { getUserRoomRole, hasPermission } from "@/lib/permissions";
+import { deleteRoomImages } from "@/lib/gridfs";   
 
 type Params = { roomId: string };
 
@@ -44,11 +45,15 @@ export async function DELETE(_req: Request, ctx: { params: Promise<Params> }) {
     }
 
 
-    const [nodesDel, edgesDel, membersDel, invitesDel] = await Promise.all([
+    const [nodesDel, edgesDel, membersDel, invitesDel, imagesDel] = await Promise.all([
       nodes.deleteMany({ roomId: roomIdObj }),
       edges.deleteMany({ roomId: roomIdObj }),
       roomMembers.deleteMany({ roomId: roomIdObj }),
       roomInvites.deleteMany({ roomId: roomIdObj }),
+      deleteRoomImages(roomId).catch((error) => {
+        console.error(`Failed to delete images for room ${roomId}:`, error);
+        return 0; // Continue even if image deletion fails
+      }),
     ]);
 
     const roomDel = await rooms.deleteOne({ _id: roomIdObj });
@@ -64,6 +69,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<Params> }) {
         edges: edgesDel.deletedCount ?? 0,
         members: membersDel.deletedCount ?? 0,
         invites: invitesDel.deletedCount ?? 0,
+        images: imagesDel,
         rooms: roomDel.deletedCount ?? 0,
       },
     });

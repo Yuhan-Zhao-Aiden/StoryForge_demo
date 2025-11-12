@@ -22,11 +22,11 @@ import {
   type StoryFlowNode,
   type StoryFlowEdge,
 } from "@/hooks/useStoryGraphStore";
-import type { StoryEdge, StoryNode } from "@/lib/types/editor";
+import type { StoryEdge, StoryNode, MediaItem } from "@/lib/types/editor";
 import { Input } from "@/components/ui/input";
 import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
-import { useRouter } from "next/navigation";
 import StoryNodeCard from "@/components/editor/StoryNodeCard";
+import { NodeImageManager } from "@/components/editor/NodeImageManager";
 
 const storyNodeTypes: NodeTypes = {
   scene: StoryNodeCard,
@@ -49,7 +49,6 @@ export function EditorShell({ room }: EditorShellProps) {
   const canEdit = room.role === "owner" || room.role === "editor";
   const nodes = useStoryGraphStore((state) => state.nodes);
   const edges = useStoryGraphStore((state) => state.edges);
-  const router = useRouter();
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -246,14 +245,14 @@ export function EditorShell({ room }: EditorShellProps) {
   const [nodeTitle, setNodeTitle] = useState("");
   const [nodeContent, setNodeContent] = useState("");
   const [nodeColor, setNodeColor] = useState("#2563eb");
-  const [imageUrl, setImageUrl] = useState("");
+  const [nodeMedia, setNodeMedia] = useState<MediaItem | null>(null);
 
   useEffect(() => {
     if (!selectedNode) {
       setNodeTitle("");
       setNodeContent("");
       setNodeColor("#2563eb");
-      setImageUrl("");
+      setNodeMedia(null);
       return;
     }
     setNodeTitle(selectedNode.data.title ?? "");
@@ -262,7 +261,7 @@ export function EditorShell({ room }: EditorShellProps) {
     const existingImage = selectedNode.data.content?.media?.find(
       (media) => media.type === "image"
     );
-    setImageUrl(existingImage?.url ?? "");
+    setNodeMedia(existingImage ?? null);
   }, [selectedNode]);
 
   useEffect(() => {
@@ -285,15 +284,7 @@ export function EditorShell({ room }: EditorShellProps) {
           ...(selectedNode.data.content?.media?.filter(
             (media) => media.type !== "image"
           ) ?? []),
-          ...(imageUrl
-            ? [
-                {
-                  id: crypto.randomUUID(),
-                  type: "image" as const,
-                  url: imageUrl,
-                },
-              ]
-            : []),
+          ...(nodeMedia ? [nodeMedia] : []),
         ],
       },
     });
@@ -303,7 +294,7 @@ export function EditorShell({ room }: EditorShellProps) {
     nodeTitle,
     nodeColor,
     nodeContent,
-    imageUrl,
+    nodeMedia,
     updateNode,
   ]);
 
@@ -493,14 +484,14 @@ export function EditorShell({ room }: EditorShellProps) {
                 </div>
                 <div>
                   <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                    Image URL
+                    Image
                   </label>
-                  <Input
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
+                  <NodeImageManager
+                    roomId={room.id}
+                    nodeId={selectedNode.id}
+                    currentMedia={nodeMedia}
+                    onMediaUpdate={(media) => setNodeMedia(media)}
                     disabled={!canEdit}
-                    placeholder="https://example.com/image.jpg"
-                    className="text-sm"
                   />
                 </div>
                 {selectedNode && (
