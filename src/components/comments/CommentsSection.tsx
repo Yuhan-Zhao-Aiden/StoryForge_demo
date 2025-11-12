@@ -80,6 +80,7 @@ export default function CommentsSection({
   const [submitting, setSubmitting] = useState(false);
   const [sortOption, setSortOption] = useState<"newest" | "oldest">("newest");
   const [error, setError] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   // Mention states
   const [mentionState, setMentionState] = useState<MentionState>({
@@ -426,6 +427,7 @@ export default function CommentsSection({
     }
   };
 
+  //handelling pin comment
   const handlePinComment = async (commentId: string, pin: boolean) => {
     try {
       setError(null);
@@ -509,22 +511,29 @@ export default function CommentsSection({
     return comments.filter((comment) => comment.parentId === commentId);
   };
 
-  const topLevelComments = comments
-    .filter((comment) => !comment.parentId)
-    .sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
+  const filteredComments = comments.filter((comment) => {
+  const contentMatch = comment.content
+    .toLowerCase()
+    .includes(searchTerm.toLowerCase());
+  const authorMatch = comment.author.username
+    ?.toLowerCase()
+    .includes(searchTerm.toLowerCase());
+  return contentMatch || authorMatch;
+});
 
-      if (sortOption === "newest") {
-        return (
-          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-        );
-      } else {
-        return (
-          new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-        );
-      }
-    });
+const topLevelComments = filteredComments
+  .filter((comment) => !comment.parentId)
+  .sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+
+    if (sortOption === "newest") {
+      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+    } else {
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+    }
+  });
+
 
   if (loading) {
     return (
@@ -549,18 +558,34 @@ export default function CommentsSection({
         </div>
       )}
 
-      {/* Sort bar */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">{comments.length} Comments</h2>
-        <select
-          value={sortOption}
-          onChange={(e) => setSortOption(e.target.value as "newest" | "oldest")}
-          className="text-sm border rounded-md px-2 py-1 bg-transparent"
-        >
-          <option value="newest">Newest first</option>
-          <option value="oldest">Oldest first</option>
-        </select>
-      </div>
+{/* Toolbar: Comment count above, Search and Sort side by side below */}
+<div className="mt-4">
+  {/* Comment count */}
+  <h2 className="text-lg font-semibold mb-3">{comments.length} Comments</h2>
+  
+  {/* Search and Sort container */}
+  <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+    {/* Search field */}
+    <input
+      type="text"
+      placeholder="Search comments..."
+      value={searchTerm}
+      onChange={(e) => setSearchTerm(e.target.value)}
+      className="flex-1 text-sm border border-gray-600 rounded-md px-3 py-2 bg-transparent text-white focus:outline-none focus:ring-1 focus:ring-gray-400 w-full sm:w-auto"
+    />
+
+    {/* Sort dropdown */}
+    <select
+  value={sortOption}
+  onChange={(e) => setSortOption(e.target.value as "newest" | "oldest")}
+  className="text-sm border border-gray-600 rounded-md px-3 py-2 bg-gray-800 text-white focus:outline-none focus:ring-1 focus:ring-gray-400 w-full sm:w-40"
+>
+  <option value="newest" className="bg-gray-800 text-white">Newest first</option>
+  <option value="oldest" className="bg-gray-800 text-white">Oldest first</option>
+</select>
+  </div>
+</div>
+
 
       {/* Add comment box - Show for everyone */}
       <div className="flex gap-3 items-start">
