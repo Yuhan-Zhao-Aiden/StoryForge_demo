@@ -2,12 +2,35 @@
 
 import { Handle, Position, type NodeProps } from "@xyflow/react";
 import type { StoryFlowNode } from "@/hooks/useStoryGraphStore";
+import { useState } from "react";
+import { ImageOff } from "lucide-react";
 
 export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
   const { title, content } = data;
-  const imageUrl = content?.media?.find((media) => media.type === "image")?.url;
+  const imageMedia = content?.media?.find((media) => media.type === "image");
   const text = content?.text ?? "";
   const color = data.color ?? "#2563eb";
+  
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const [imageError, setImageError] = useState(false);
+
+  // Get the image URL based on the media source
+  const getImageUrl = () => {
+    if (!imageMedia) return null;
+    
+    if (imageMedia.source === "url") {
+      return imageMedia.url;
+    } else if (imageMedia.source === "uploaded") {
+      // Construct the API URL from the node data
+      const roomId = data.roomId;
+      const nodeId = data.id;
+      return `/api/rooms/${roomId}/nodes/${nodeId}/images/${imageMedia.fileId}`;
+    }
+    
+    return null;
+  };
+
+  const imageUrl = getImageUrl();
 
   return (
     <div className="relative w-56">
@@ -23,14 +46,33 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
         style={{ borderColor: color }}
       >
         {imageUrl ? (
-          <div className="h-32 w-full overflow-hidden bg-muted">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={imageUrl}
-              alt={title ?? "Node image"}
-              className="h-full w-full object-cover"
-              loading="lazy"
-            />
+          <div className="relative h-32 w-full overflow-hidden bg-muted">
+            {!imageLoaded && !imageError && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            )}
+            {imageError ? (
+              <div className="flex h-full w-full flex-col items-center justify-center gap-1 bg-muted text-muted-foreground">
+                <ImageOff className="h-8 w-8" />
+                <span className="text-xs">Failed to load</span>
+              </div>
+            ) : (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imageUrl}
+                alt={title ?? "Node image"}
+                className={`h-full w-full object-cover transition-opacity ${
+                  imageLoaded ? "opacity-100" : "opacity-0"
+                }`}
+                loading="lazy"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => {
+                  setImageError(true);
+                  setImageLoaded(false);
+                }}
+              />
+            )}
           </div>
         ) : (
           <div className="flex h-32 w-full items-center justify-center bg-muted text-xs text-muted-foreground">
