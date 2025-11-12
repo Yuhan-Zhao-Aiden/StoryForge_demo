@@ -27,6 +27,7 @@ import { Input } from "@/components/ui/input";
 import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
 import StoryNodeCard from "@/components/editor/StoryNodeCard";
 import { NodeImageManager } from "@/components/editor/NodeImageManager";
+import { AIContentEditor } from "@/components/editor/AIContentEditor";
 
 const storyNodeTypes: NodeTypes = {
   scene: StoryNodeCard,
@@ -226,6 +227,7 @@ export function EditorShell({ room }: EditorShellProps) {
                 text: node.data.content?.text ?? "",
                 summary: node.data.content?.summary,
                 media: node.data.content?.media ?? [],
+                generatedBy: "user",
               },
             });
           }
@@ -286,6 +288,7 @@ export function EditorShell({ room }: EditorShellProps) {
           ) ?? []),
           ...(nodeMedia ? [nodeMedia] : []),
         ],
+        generatedBy: selectedNode.data.content?.generatedBy ?? "user",
       },
     });
   }, [
@@ -475,11 +478,33 @@ export function EditorShell({ room }: EditorShellProps) {
                   <label className="mb-1 block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
                     Content
                   </label>
-                  <textarea
+                  <AIContentEditor
+                    roomId={room.id}
+                    nodeId={selectedNode.id}
+                    nodeType={selectedNode.type as "scene" | "choice" | "ending" | "note"}
                     value={nodeContent}
-                    onChange={(e) => setNodeContent(e.target.value)}
+                    onChange={setNodeContent}
+                    onGenerate={(generatedContent, prompt) => {
+                      // Update the node with AI-generated content
+                      updateNode(selectedNode.id, {
+                        title: nodeTitle || "Untitled Node",
+                        color: nodeColor,
+                        content: {
+                          text: generatedContent,
+                          summary: selectedNode.data.content?.summary,
+                          media: [
+                            ...(selectedNode.data.content?.media?.filter(
+                              (media) => media.type !== "image"
+                            ) ?? []),
+                            ...(nodeMedia ? [nodeMedia] : []),
+                          ],
+                          generatedBy: "ai",
+                          generatedAt: new Date(),
+                          generationPrompt: prompt,
+                        },
+                      });
+                    }}
                     disabled={!canEdit}
-                    className="min-h-24 w-full rounded border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-70"
                   />
                 </div>
                 <div>
