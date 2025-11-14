@@ -14,7 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Trash2, X, CheckCircle2, AlertTriangle } from "lucide-react";
-import { FlagReason, flagReasonLabels, FlaggedContent } from "@/lib/types/moderation";
+import { flagReasonLabels, FlaggedContent } from "@/lib/types/moderation";
 
 type Props = {
   roomId: string;
@@ -36,13 +36,7 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
   const [action, setAction] = React.useState<"remove" | "dismiss" | null>(null);
   const [reviewNotes, setReviewNotes] = React.useState("");
 
-  React.useEffect(() => {
-    if (open) {
-      loadFlaggedContent();
-    }
-  }, [open, roomId]);
-
-  async function loadFlaggedContent() {
+  const loadFlaggedContent = React.useCallback(async () => {
     try {
       const res = await fetch(`/api/rooms/${roomId}/moderation/flagged`);
       if (!res.ok) throw new Error("Failed to load flagged content");
@@ -51,7 +45,13 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
     } catch (e) {
       console.error("Failed to load flagged content:", e);
     }
-  }
+  }, [roomId]);
+
+  React.useEffect(() => {
+    if (open) {
+      loadFlaggedContent();
+    }
+  }, [open, loadFlaggedContent]);
 
   async function handleRemove(item: FlaggedItem) {
     setLoading(true);
@@ -115,7 +115,7 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
     }
   }
 
-  function formatDate(date: Date | string | null) {
+  function formatDate(date: Date | string | null | undefined) {
     if (!date) return "N/A";
     return new Date(date).toLocaleString();
   }
@@ -199,7 +199,7 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
                           Flagged by: {item.flaggedBy?.username || item.flaggedBy?.email || "Unknown"} on {formatDate(item.flaggedAt)}
                         </p>
                         {item.description && (
-                          <p className="text-sm mt-2 italic">"{item.description}"</p>
+                          <p className="text-sm mt-2 italic">&ldquo;{item.description}&rdquo;</p>
                         )}
                       </div>
                     </div>
