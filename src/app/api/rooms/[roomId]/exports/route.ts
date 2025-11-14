@@ -74,7 +74,10 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   await db.collection("storyExports").insertOne(exportDoc);
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
+  // Get base URL from request headers or environment variables
+  const host = req.headers.get("host");
+  const protocol = req.headers.get("x-forwarded-proto") || "http";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || (host ? `${protocol}://${host}` : "http://localhost:3000");
   const shareUrl = `${baseUrl}/exports/${shareToken}`;
 
   return jsonSuccess(
@@ -96,7 +99,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
 }
 
 // GET - List all export links for a room
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
   const roomId = await getRoomIdFromContext(context);
   const access = await requireRoomAccess(roomId);
   if (!access.ok) return access.response;
@@ -118,7 +121,10 @@ export async function GET(_req: NextRequest, context: RouteContext) {
     .sort({ createdAt: -1 })
     .toArray();
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || "http://localhost:3000";
+  // Get base URL from request headers or environment variables
+  const host = req.headers.get("host");
+  const protocol = req.headers.get("x-forwarded-proto") || "http";
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXTAUTH_URL || (host ? `${protocol}://${host}` : "http://localhost:3000");
 
   const exportLinks: ExportLink[] = exports.map((exp) => ({
     _id: exp._id.toString(),
