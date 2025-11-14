@@ -15,6 +15,7 @@ import { ExportStoryDialog } from "@/app/dashboard/_components/ExportStoryDialog
 import { ViewCollaboratorsDialog } from "./ViewCollaboratorsDialog"; 
 import { ManageCollaborators } from "./ManageCollaborators";
 import { ActivityLog } from "./ActivityLog";
+import { ExportDialog } from "./ExportDialog";
 import { useDeleteRoom } from "@/hooks/useDeleteRoom";
 import { useLeaveRoom } from "@/hooks/useLeaveRoom"; 
 
@@ -45,7 +46,7 @@ export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
         <DropdownMenuLabel>{isOwner ? "My Story" : "Story Actions"}</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
-        {invitable && (
+        {invitable && isOwner && (
           <GenerateInvite
             roomId={room._id}
             trigger={

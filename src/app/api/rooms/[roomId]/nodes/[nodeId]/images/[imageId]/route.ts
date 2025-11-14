@@ -30,9 +30,14 @@ async function getParamsFromContext(context: RouteContext) {
 export async function GET(_req: NextRequest, context: RouteContext) {
   const { roomId, nodeId, imageId } = await getParamsFromContext(context);
 
+  console.log("Image GET request:", { roomId, nodeId, imageId });
+
   // Check room access (read permission is sufficient)
   const access = await requireRoomAccess(roomId);
-  if (!access.ok) return access.response;
+  if (!access.ok) {
+    console.error("Room access denied:", { roomId, error: access.response });
+    return access.response;
+  }
 
   const { roomId: roomObjectId } = access.context;
 
@@ -51,20 +56,42 @@ export async function GET(_req: NextRequest, context: RouteContext) {
   let metadata;
   try {
     metadata = await getImageMetadata(imageObjectId);
+    console.log("Image metadata retrieved:", {
+      hasMetadata: !!metadata,
+      metadataRoomId: metadata?.metadata?.roomId,
+      metadataNodeId: metadata?.metadata?.nodeId,
+    });
   } catch (error: any) {
     console.error("Failed to get image metadata:", error);
     return jsonError(500, "Failed to retrieve image");
   }
 
   if (!metadata) {
+    console.error("Image metadata not found for imageId:", imageId);
     return jsonError(404, "Image not found");
   }
 
   // Verify the image belongs to the specified room and node
-  if (
-    metadata.metadata?.roomId !== roomObjectId.toString() ||
-    metadata.metadata?.nodeId !== nodeId
-  ) {
+  // Normalize roomId comparison (handle both string and ObjectId formats)
+  const storedRoomId = metadata.metadata?.roomId;
+  const storedNodeId = metadata.metadata?.nodeId;
+  const expectedRoomId = roomObjectId.toString();
+  
+  // Compare roomId - handle both string formats
+  const roomIdMatches = storedRoomId === expectedRoomId || 
+                        (storedRoomId && new ObjectId(storedRoomId).equals(roomObjectId));
+  
+  // Compare nodeId - should be exact string match
+  const nodeIdMatches = storedNodeId === nodeId;
+  
+  if (!roomIdMatches || !nodeIdMatches) {
+    console.error("Image metadata mismatch in GET:", {
+      storedRoomId,
+      expectedRoomId,
+      storedNodeId,
+      expectedNodeId: nodeId,
+      imageId: imageId,
+    });
     return jsonError(404, "Image not found");
   }
 
@@ -162,10 +189,26 @@ export async function DELETE(_req: NextRequest, context: RouteContext) {
   }
 
   // Verify the image belongs to the specified room and node
-  if (
-    metadata.metadata?.roomId !== roomObjectId.toString() ||
-    metadata.metadata?.nodeId !== nodeId
-  ) {
+  // Normalize roomId comparison (handle both string and ObjectId formats)
+  const storedRoomId = metadata.metadata?.roomId;
+  const storedNodeId = metadata.metadata?.nodeId;
+  const expectedRoomId = roomObjectId.toString();
+  
+  // Compare roomId - handle both string formats
+  const roomIdMatches = storedRoomId === expectedRoomId || 
+                        (storedRoomId && new ObjectId(storedRoomId).equals(roomObjectId));
+  
+  // Compare nodeId - should be exact string match
+  const nodeIdMatches = storedNodeId === nodeId;
+  
+  if (!roomIdMatches || !nodeIdMatches) {
+    console.error("Image metadata mismatch in DELETE:", {
+      storedRoomId,
+      expectedRoomId,
+      storedNodeId,
+      expectedNodeId: nodeId,
+      imageId: imageId,
+    });
     return jsonError(404, "Image not found");
   }
 
