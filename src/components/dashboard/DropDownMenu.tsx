@@ -1,5 +1,4 @@
 "use client";
-
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +10,6 @@ import {
 
 import { GenerateInvite } from "./GenerateInvite";
 import { EditStoryDialog } from "@/app/dashboard/_components/StoryForm";
-import { ExportStoryDialog } from "@/app/dashboard/_components/ExportStoryDialog";
 import { ViewCollaboratorsDialog } from "./ViewCollaboratorsDialog"; 
 import { ManageCollaborators } from "./ManageCollaborators";
 import { ActivityLog } from "./ActivityLog";
@@ -100,15 +98,11 @@ export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
           />
         )}
         
-        <ExportStoryDialog
+        <ExportDialog
           roomId={room._id}
-          trigger={
-            <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-            Export
-            </DropdownMenuItem>
-          }
+          trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Export</DropdownMenuItem>}
         />
-        
+
         {isOwner && (
           <>
             <DropdownMenuSeparator />
