@@ -28,6 +28,9 @@ import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
 import StoryNodeCard from "@/components/editor/StoryNodeCard";
 import { NodeImageManager } from "@/components/editor/NodeImageManager";
 import { AIContentEditor } from "@/components/editor/AIContentEditor";
+import { ModerationPanel } from "@/components/moderation/ModerationPanel";
+import { FlagContentButton } from "@/components/moderation/FlagContentButton";
+import { Flag } from "lucide-react";
 
 const storyNodeTypes: NodeTypes = {
   scene: StoryNodeCard,
@@ -75,6 +78,7 @@ export function EditorShell({ room }: EditorShellProps) {
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const {
     createNode,
@@ -88,61 +92,66 @@ export function EditorShell({ room }: EditorShellProps) {
     clearError,
   } = useStoryGraphActions(room.id, canEdit);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadGraph = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [nodesRes, edgesRes] = await Promise.all([
+        fetch(`/api/rooms/${room.id}/nodes`, { cache: "no-store" }),
+        fetch(`/api/rooms/${room.id}/edges`, { cache: "no-store" }),
+      ]);
 
-    async function loadGraph() {
-      setLoading(true);
-      setError(null);
-      try {
-        const [nodesRes, edgesRes] = await Promise.all([
-          fetch(`/api/rooms/${room.id}/nodes`, { cache: "no-store" }),
-          fetch(`/api/rooms/${room.id}/edges`, { cache: "no-store" }),
-        ]);
-
-        if (!nodesRes.ok) {
-          const detail = await nodesRes.json().catch(() => null);
-          throw new Error(detail?.error ?? "Failed to load nodes");
-        }
-        if (!edgesRes.ok) {
-          const detail = await edgesRes.json().catch(() => null);
-          throw new Error(detail?.error ?? "Failed to load edges");
-        }
-
-        const nodePayload: StoryNode[] =
-          nodesRes.status === 204
-            ? []
-            : ((await nodesRes.json()) as { nodes?: StoryNode[] }).nodes ?? [];
-        const edgePayload: StoryEdge[] =
-          edgesRes.status === 204
-            ? []
-            : ((await edgesRes.json()) as { edges?: StoryEdge[] }).edges ?? [];
-
-        if (!cancelled) {
-          initializeGraph({
-            roomId: room.id,
-            nodes: nodePayload,
-            edges: edgePayload,
-          });
-        }
-      } catch (err: unknown) {
-        if (!cancelled) {
-          const message =
-            err instanceof Error ? err.message : "Unable to load story graph";
-          setError(message);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoading(false);
-        }
+      if (!nodesRes.ok) {
+        const detail = await nodesRes.json().catch(() => null);
+        throw new Error(detail?.error ?? "Failed to load nodes");
       }
-    }
+      if (!edgesRes.ok) {
+        const detail = await edgesRes.json().catch(() => null);
+        throw new Error(detail?.error ?? "Failed to load edges");
+      }
 
-    loadGraph();
-    return () => {
-      cancelled = true;
-    };
+      const nodePayload: StoryNode[] =
+        nodesRes.status === 204
+          ? []
+          : ((await nodesRes.json()) as { nodes?: StoryNode[] }).nodes ?? [];
+      const edgePayload: StoryEdge[] =
+        edgesRes.status === 204
+          ? []
+          : ((await edgesRes.json()) as { edges?: StoryEdge[] }).edges ?? [];
+
+      initializeGraph({
+        roomId: room.id,
+        nodes: nodePayload,
+        edges: edgePayload,
+      });
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Unable to load story graph";
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
   }, [initializeGraph, room.id]);
+
+  useEffect(() => {
+    loadGraph();
+  }, [loadGraph, refreshKey]);
+
+  // Listen for refresh events from moderation panel
+  useEffect(() => {
+    const handleRefresh = () => {
+      setRefreshKey((prev) => prev + 1);
+    };
+
+    window.addEventListener("refreshEditor", handleRefresh);
+    return () => {
+      window.removeEventListener("refreshEditor", handleRefresh);
+    };
+  }, []);
+
+  const handleContentRemoved = useCallback(() => {
+    setRefreshKey((prev) => prev + 1);
+  }, []);
 
   const handleSelectionChange = useCallback<OnSelectionChangeFunc>(
     (selection) => {
@@ -339,6 +348,9 @@ export function EditorShell({ room }: EditorShellProps) {
                 Read-only
               </Badge>
             )}
+            {room.role === "owner" && (
+              <ModerationPanel roomId={room.id} onContentRemoved={handleContentRemoved} />
+            )}
             <Button
               type="button"
               size="sm"
@@ -515,30 +527,70 @@ export function EditorShell({ room }: EditorShellProps) {
                     roomId={room.id}
                     nodeId={selectedNode.id}
                     currentMedia={nodeMedia}
-                    onMediaUpdate={(media) => setNodeMedia(media)}
+                    onMediaUpdate={async (media) => {
+                      setNodeMedia(media);
+                      // Auto-save image when uploaded
+                      if (media && selectedNode && canEdit) {
+                        try {
+                          await updateNode(selectedNode.id, {
+                            content: {
+                              ...(selectedNode.data.content ?? {}),
+                              media: [
+                                ...(selectedNode.data.content?.media?.filter(
+                                  (m) => m.type !== "image"
+                                ) ?? []),
+                                media,
+                              ],
+                            },
+                          });
+                        } catch (err) {
+                          console.error("Failed to auto-save image:", err);
+                        }
+                      }
+                    }}
                     disabled={!canEdit}
                   />
                 </div>
                 {selectedNode && (
-                  <div className="flex items-center justify-between">
-                    <Button size="sm" onClick={handleSaveNodeDetails}>
-                      Save Changes
-                    </Button>
-                    <div className="flex gap-2">
-                      <CommentsDrawer
-                        room={room}
-                        node={selectedNode}
-                        userRole={room.role}
-                        currentUserId={currentUserId}
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="destructive"
-                        onClick={handleDeleteNode}
-                      >
-                        Delete
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button size="sm" onClick={handleSaveNodeDetails}>
+                        Save Changes
                       </Button>
+                      <div className="flex gap-2">
+                        <CommentsDrawer
+                          room={room}
+                          node={selectedNode}
+                          userRole={room.role}
+                          currentUserId={currentUserId}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          onClick={handleDeleteNode}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="pt-2 border-t">
+                      <FlagContentButton
+                        roomId={room.id}
+                        contentType="node"
+                        contentId={selectedNode.id}
+                        trigger={
+                          <Button 
+                            type="button" 
+                            size="sm" 
+                            variant="destructive"
+                            className="w-full"
+                          >
+                            <Flag className="h-4 w-4 mr-2" />
+                            Flag Content
+                          </Button>
+                        }
+                      />
                     </div>
                   </div>
                 )}

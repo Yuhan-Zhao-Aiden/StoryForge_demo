@@ -17,7 +17,9 @@ import {
   XCircle,
   Send,
   Reply,
+  Flag,
 } from "lucide-react";
+import { FlagContentButton } from "@/components/moderation/FlagContentButton";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1018,6 +1020,27 @@ function CommentItem({
                     Delete
                   </DropdownMenuItem>
                 )}
+
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    // Flag button will be handled by FlagContentButton component
+                  }}
+                  className="text-muted-foreground"
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  <FlagContentButton
+                    roomId={comment.roomId}
+                    contentType="comment"
+                    contentId={comment._id}
+                    trigger={
+                      <div className="flex items-center w-full">
+                        <Flag className="w-4 h-4 mr-2" />
+                        Flag Content
+                      </div>
+                    }
+                  />
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           )}

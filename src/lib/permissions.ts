@@ -17,6 +17,11 @@ export const PERMISSIONS = {
   VIEW_ROOM: ["owner", "editor", "viewer"],
   VIEW_NODES: ["owner", "editor", "viewer"],
   VIEW_EDGES: ["owner", "editor", "viewer"],
+  EXPORT_ROOM: ["owner", "editor", "viewer"],
+  MANAGE_EXPORTS: ["owner", "editor"],
+  FLAG_CONTENT: ["owner", "editor", "viewer"],
+  MODERATE_CONTENT: ["owner"],
+  REMOVE_FLAGGED_CONTENT: ["owner"],
 } as const;
 
 export type Permission = keyof typeof PERMISSIONS;
