@@ -4,9 +4,9 @@ import { ObjectId } from "mongodb";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { roomId: string } }
+  context: { params: Promise<{ roomId: string }> }
 ) {
-  const { roomId } = params;
+  const { roomId } = await context.params;
   const format = req.nextUrl.searchParams.get("format") || "json";
 
   // New export options
