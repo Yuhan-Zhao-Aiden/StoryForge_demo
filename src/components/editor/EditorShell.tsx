@@ -527,7 +527,27 @@ export function EditorShell({ room }: EditorShellProps) {
                     roomId={room.id}
                     nodeId={selectedNode.id}
                     currentMedia={nodeMedia}
-                    onMediaUpdate={(media) => setNodeMedia(media)}
+                    onMediaUpdate={async (media) => {
+                      setNodeMedia(media);
+                      // Auto-save image when uploaded
+                      if (media && selectedNode && canEdit) {
+                        try {
+                          await updateNode(selectedNode.id, {
+                            content: {
+                              ...(selectedNode.data.content ?? {}),
+                              media: [
+                                ...(selectedNode.data.content?.media?.filter(
+                                  (m) => m.type !== "image"
+                                ) ?? []),
+                                media,
+                              ],
+                            },
+                          });
+                        } catch (err) {
+                          console.error("Failed to auto-save image:", err);
+                        }
+                      }
+                    }}
                     disabled={!canEdit}
                   />
                 </div>

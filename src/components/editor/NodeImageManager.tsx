@@ -140,14 +140,24 @@ export function NodeImageManager({
           }
         );
 
-        if (!response.ok) {
-          console.error("Failed to delete image from server");
+        // 404 means image already deleted, which is fine
+        // 200 means successful deletion
+        // Other errors should be logged but not block the UI update
+        if (!response.ok && response.status !== 404) {
+          const errorData = await response.json().catch(() => ({}));
+          const errorMessage = errorData.error || `Failed to delete image (${response.status})`;
+          console.warn("Failed to delete image from server:", errorMessage);
+          // Don't set error state - still clear the image from UI
+          // The image might be deleted anyway, or the user can try again
         }
       } catch (err) {
-        console.error("Error deleting image:", err);
+        // Network errors or other issues - log but don't block UI update
+        console.warn("Error deleting image:", err);
+        // Still proceed to clear the image from UI
       }
     }
 
+    // Always clear the image from UI regardless of deletion result
     onMediaUpdate(null);
     setUrlInput("");
   }, [currentMedia, roomId, nodeId, onMediaUpdate]);

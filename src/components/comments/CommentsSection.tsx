@@ -1030,7 +1030,7 @@ function CommentItem({
                   onSelect={(e) => e.preventDefault()}
                 >
                   <FlagContentButton
-                    roomId={room.id}
+                    roomId={comment.roomId}
                     contentType="comment"
                     contentId={comment._id}
                     trigger={
