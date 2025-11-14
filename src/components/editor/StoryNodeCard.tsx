@@ -17,12 +17,19 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
   const [imageError, setImageError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   
+  // Get media identifier for effect dependency
+  const mediaIdentifier = imageMedia?.source === "uploaded" 
+    ? imageMedia.fileId 
+    : imageMedia?.source === "url" 
+    ? imageMedia.url 
+    : null;
+  
   // Reset image state when imageUrl changes
   useEffect(() => {
     setImageLoaded(false);
     setImageError(false);
     setRetryCount(0);
-  }, [imageMedia?.fileId, imageMedia?.url, roomId, data.id]);
+  }, [mediaIdentifier, roomId, data.id]);
 
   // Get the image URL based on the media source
   const getImageUrl = () => {
@@ -102,7 +109,7 @@ export function StoryNodeCard({ data, selected }: NodeProps<StoryFlowNode>) {
                     imageUrl,
                     nodeId: data.id,
                     roomId: roomId || data.roomId,
-                    fileId: imageMedia?.fileId,
+                    fileId: imageMedia?.source === "uploaded" ? imageMedia.fileId : undefined,
                     retryCount,
                     imageMedia,
                   });
