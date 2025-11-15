@@ -1,4 +1,6 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# StoryForge
+
+StoryForge is a collaborative story board that allows users to create story in a node based editor. Checkout the latest version: https://story-forge-demo.vercel.app/
 
 ## Getting Started
 
