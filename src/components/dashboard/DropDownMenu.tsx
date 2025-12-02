@@ -1,4 +1,6 @@
 "use client";
+
+import { useState, useEffect } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,6 +9,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { GitBranch } from "lucide-react";
 
 import { GenerateInvite } from "./GenerateInvite";
 import { EditStoryDialog } from "@/app/dashboard/_components/StoryForm";
@@ -16,7 +19,8 @@ import { ActivityLog } from "./ActivityLog";
 import { ExportDialog } from "./ExportDialog";
 import { useDeleteRoom } from "@/hooks/useDeleteRoom";
 import { useLeaveRoom } from "@/hooks/useLeaveRoom"; 
-
+import { ForkDialog } from "./ForkDialog";
+import { BranchesDialog } from "./BranchesDialog";
 type Story = {
   _id: string;
   title: string;
@@ -31,16 +35,79 @@ type StoryMenuProps = {
   invitable?: boolean;
 };
 
+// Create a wrapper component to handle client-side only rendering
+function ForkMenuItems({ roomId }: { roomId: string }) {
+  const [showForkDialog, setShowForkDialog] = useState(false);
+  const [showBranchesDialog, setShowBranchesDialog] = useState(false);
+  
+  return (
+    <>
+      <DropdownMenuItem 
+        onClick={() => setShowForkDialog(true)}
+        onSelect={(e) => e.preventDefault()}
+      >
+        <GitBranch className="mr-2 h-4 w-4" />
+        Fork Story
+      </DropdownMenuItem>
+      <DropdownMenuItem 
+        onClick={() => setShowBranchesDialog(true)}
+        onSelect={(e) => e.preventDefault()}
+      >
+        <GitBranch className="mr-2 h-4 w-4" />
+        View Branches
+      </DropdownMenuItem>
+      
+      {/* These dialogs will be imported dynamically on client-side */}
+      {showForkDialog && (
+        <ForkDialog
+          open={showForkDialog}
+          onOpenChange={setShowForkDialog}
+          roomId={roomId}
+        />
+      )}
+      
+      {showBranchesDialog && (
+        <BranchesDialog
+          open={showBranchesDialog}
+          onOpenChange={setShowBranchesDialog}
+          roomId={roomId}
+        />
+      )}
+    </>
+  );
+}
+
 export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
   const { handleDeleteStory, loading: deleteLoading } = useDeleteRoom();
   const { handleLeaveRoom, loading: leaveLoading } = useLeaveRoom();
+  
+  const [mounted, setMounted] = useState(false);
+  const [ForkDialog, setForkDialog] = useState<any>(null);
+  const [BranchesDialog, setBranchesDialog] = useState<any>(null);
 
   const isOwner = !room.role || room.role === "owner";
+  const canFork = room.role === "owner" || room.role === "editor";
+
+  // Dynamically import dialogs only on client-side
+  useEffect(() => {
+    setMounted(true);
+    import("./ForkDialog").then((mod) => setForkDialog(() => mod.ForkDialog));
+    import("./BranchesDialog").then((mod) => setBranchesDialog(() => mod.BranchesDialog));
+  }, []);
+
+  // Don't render dropdown until mounted to avoid hydration mismatch
+  if (!mounted) {
+    return <div className="inline-flex h-8 w-8 items-center justify-center">•••</div>;
+  }
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger>•••</DropdownMenuTrigger>
-      <DropdownMenuContent className="min-w-[200px]">
+      <DropdownMenuTrigger asChild>
+        <button className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-accent">
+          •••
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="min-w-[200px]" align="end">
         <DropdownMenuLabel>{isOwner ? "My Story" : "Story Actions"}</DropdownMenuLabel>
         <DropdownMenuSeparator />
 
@@ -103,11 +170,19 @@ export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
           trigger={<DropdownMenuItem onSelect={(e) => e.preventDefault()}>Export</DropdownMenuItem>}
         />
 
+        {/* Add fork options */}
+        {canFork && (
+          <>
+            <DropdownMenuSeparator />
+            <ForkMenuItems roomId={room._id} />
+          </>
+        )}
+
         {isOwner && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="bg-red-500 focus:bg-red-700"
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
               onClick={() => handleDeleteStory(room._id)}
               disabled={deleteLoading}
             >
@@ -120,7 +195,7 @@ export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              className="bg-red-500 focus:bg-red-700"
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive"
               onClick={() => handleLeaveRoom(room._id)}
               disabled={leaveLoading}
             >

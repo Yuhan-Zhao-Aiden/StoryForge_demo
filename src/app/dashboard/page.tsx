@@ -42,6 +42,7 @@ type RoomDoc = {
   collaborators?: number | null;
   visibility?: "private" | "unlisted" | "public";
   updatedAt?: Date;
+  isFork?: boolean;
 };
 
 // Helpers
@@ -97,7 +98,7 @@ async function loadData() {
   // Owned rooms
   const ownedRooms: RoomDoc[] = (await db
     .collection<RoomDoc>("rooms")
-    .find({ ownerId: userId })
+    .find({ ownerId: userId, isFork: { $ne: true } })
     .project({
       title: 1,
       subtitle: 1,
@@ -120,7 +121,7 @@ async function loadData() {
   if (collabIds.length) {
     collabRooms = (await db
       .collection<RoomDoc>("rooms")
-      .find({ _id: { $in: collabIds } })
+      .find({ _id: { $in: collabIds ,isFork: { $ne: true } } })
       .project({
         title: 1,
         subtitle: 1,
