@@ -121,7 +121,7 @@ async function loadData() {
   if (collabIds.length) {
     collabRooms = (await db
       .collection<RoomDoc>("rooms")
-      .find({ _id: { $in: collabIds ,isFork: { $ne: true } } })
+      .find({ _id: { $in: collabIds }, isFork: { $ne: true } })
       .project({
         title: 1,
         subtitle: 1,
