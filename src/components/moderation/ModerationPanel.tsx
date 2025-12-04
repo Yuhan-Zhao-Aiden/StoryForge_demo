@@ -13,13 +13,22 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Trash2, X, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Shield, Trash2, X, CheckCircle2, AlertTriangle, Users } from "lucide-react";
 import { flagReasonLabels, FlaggedContent } from "@/lib/types/moderation";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { FaCrown, FaEdit, FaEye, FaTrash } from "react-icons/fa";
 
 type Props = {
   roomId: string;
   trigger?: React.ReactNode;
   onContentRemoved?: () => void;
+  currentUserRole?: "owner" | "editor" | "viewer";
 };
 
 type FlaggedItem = FlaggedContent & {
@@ -28,13 +37,45 @@ type FlaggedItem = FlaggedContent & {
   reviewedBy: { _id: string; username: string; email: string } | null;
 };
 
-export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
+type RoomRole = "owner" | "editor" | "viewer";
+
+type Member = {
+  id: string;
+  userId: string;
+  username: string;
+  email: string;
+  role: RoomRole;
+  joinedAt: Date;
+};
+
+const roleIcons = {
+  owner: <FaCrown className="h-3 w-3 text-yellow-500" />,
+  editor: <FaEdit className="h-3 w-3 text-blue-500" />,
+  viewer: <FaEye className="h-3 w-3 text-gray-500" />,
+};
+
+const roleColors = {
+  owner: "bg-yellow-100 text-yellow-800 border-yellow-300 dark:bg-yellow-900/30 dark:text-yellow-400",
+  editor: "bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400",
+  viewer: "bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-800/30 dark:text-gray-400",
+};
+
+export function ModerationPanel({ roomId, trigger, onContentRemoved, currentUserRole = "viewer" }: Props) {
   const [open, setOpen] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [flaggedItems, setFlaggedItems] = React.useState<FlaggedItem[]>([]);
   const [selectedItem, setSelectedItem] = React.useState<FlaggedItem | null>(null);
   const [action, setAction] = React.useState<"remove" | "dismiss" | null>(null);
   const [reviewNotes, setReviewNotes] = React.useState("");
+  const [activeTab, setActiveTab] = React.useState<"moderation" | "collaborators">("moderation");
+  
+  // Collaborators state
+  const [members, setMembers] = React.useState<Member[]>([]);
+  const [membersLoading, setMembersLoading] = React.useState(false);
+  const [membersError, setMembersError] = React.useState<string | null>(null);
+  const [updatingMemberId, setUpdatingMemberId] = React.useState<string | null>(null);
+  
+  const isOwner = currentUserRole === "owner";
 
   const loadFlaggedContent = React.useCallback(async () => {
     try {
@@ -47,11 +88,33 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
     }
   }, [roomId]);
 
+  const fetchMembers = React.useCallback(async () => {
+    try {
+      setMembersLoading(true);
+      setMembersError(null);
+      const response = await fetch(`/api/rooms/${roomId}/members`);
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch members");
+      }
+
+      const data = await response.json();
+      setMembers(data.members);
+    } catch (err) {
+      setMembersError(err instanceof Error ? err.message : "Failed to load members");
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [roomId]);
+
   React.useEffect(() => {
     if (open) {
       loadFlaggedContent();
+      if (isOwner) {
+        fetchMembers();
+      }
     }
-  }, [open, loadFlaggedContent]);
+  }, [open, loadFlaggedContent, fetchMembers, isOwner]);
 
   async function handleRemove(item: FlaggedItem) {
     setLoading(true);
@@ -115,6 +178,93 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
     }
   }
 
+  const handleRoleChange = async (memberId: string, newRole: RoomRole) => {
+    try {
+      setUpdatingMemberId(memberId);
+      const response = await fetch(
+        `/api/rooms/${roomId}/members/${memberId}/role`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: newRole }),
+        }
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to update role");
+      }
+
+      const data = await response.json();
+      
+      // Update local state
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.id === memberId ? { ...m, role: data.member.role } : m
+        )
+      );
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update role");
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string, username: string) => {
+    if (!confirm(`Are you sure you want to remove ${username} from this room?`)) {
+      return;
+    }
+
+    try {
+      setUpdatingMemberId(memberId);
+      const response = await fetch(`/api/rooms/${roomId}/members`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ memberId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to remove member");
+      }
+
+      setMembers((prev) => prev.filter((m) => m.id !== memberId));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to remove member");
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
+  const handleTransferOwnership = async (userId: string, username: string) => {
+    if (!confirm(
+      `Are you sure you want to transfer ownership to ${username}?\n\nYou will become an Editor and ${username} will become the Owner. This action cannot be undone.`
+    )) {
+      return;
+    }
+
+    try {
+      setUpdatingMemberId(userId);
+      const response = await fetch(`/api/rooms/${roomId}/transfer-ownership`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ newOwnerId: userId }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to transfer ownership");
+      }
+
+      alert("Ownership transferred successfully! The page will reload.");
+      window.location.reload();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to transfer ownership");
+    } finally {
+      setUpdatingMemberId(null);
+    }
+  };
+
   function formatDate(date: Date | string | null | undefined) {
     if (!date) return "N/A";
     return new Date(date).toLocaleString();
@@ -157,13 +307,53 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Shield className="h-5 w-5" />
-            Content Moderation
+            {isOwner ? "Moderation & Collaborators" : "Content Moderation"}
           </DialogTitle>
           <DialogDescription>
-            Review and manage flagged content in this story room.
+            {isOwner 
+              ? "Review flagged content and manage room collaborators." 
+              : "Review and manage flagged content in this story room."}
           </DialogDescription>
         </DialogHeader>
 
+        {/* Tabs */}
+        {isOwner && (
+          <div className="flex border-b">
+            <button
+              onClick={() => setActiveTab("moderation")}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === "moderation"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Shield className="h-4 w-4" />
+              Moderation
+              {pendingItems.length > 0 && (
+                <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-xs">
+                  {pendingItems.length}
+                </Badge>
+              )}
+            </button>
+            <button
+              onClick={() => setActiveTab("collaborators")}
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+                activeTab === "collaborators"
+                  ? "border-primary text-primary"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              Collaborators
+              <Badge variant="outline" className="ml-1 px-1.5 py-0 text-xs">
+                {members.length}
+              </Badge>
+            </button>
+          </div>
+        )}
+
+        {/* Moderation Tab */}
+        {activeTab === "moderation" && (
         <div className="space-y-4">
           {pendingItems.length === 0 && reviewedItems.length === 0 && (
             <div className="text-center py-8 text-muted-foreground">
@@ -280,6 +470,118 @@ export function ModerationPanel({ roomId, trigger, onContentRemoved }: Props) {
             </div>
           )}
         </div>
+        )}
+
+        {/* Collaborators Tab */}
+        {activeTab === "collaborators" && isOwner && (
+          <div className="space-y-4">
+            {membersLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-muted-foreground">Loading members...</div>
+              </div>
+            ) : membersError ? (
+              <div className="rounded-md bg-destructive/10 p-4 text-sm text-destructive">
+                {membersError}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center justify-between rounded-lg border border-muted/60 bg-background p-4 hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="flex-1 min-w-0 mr-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <p className="font-medium text-sm truncate">
+                          {member.username}
+                        </p>
+                        <div
+                          className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium border ${
+                            roleColors[member.role]
+                          }`}
+                        >
+                          {roleIcons[member.role]}
+                          <span className="capitalize">{member.role}</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {member.email}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Joined{" "}
+                        {new Date(member.joinedAt).toLocaleDateString(undefined, {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        })}
+                      </p>
+                    </div>
+
+                    {member.role !== "owner" ? (
+                      <div className="flex items-center gap-2">
+                        <Select
+                          value={member.role}
+                          onValueChange={(value) =>
+                            handleRoleChange(member.id, value as RoomRole)
+                          }
+                          disabled={updatingMemberId === member.id}
+                        >
+                          <SelectTrigger className="w-32 h-9">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="editor">
+                              <div className="flex items-center gap-2">
+                                <FaEdit className="h-3 w-3 text-blue-500" />
+                                <span>Editor</span>
+                              </div>
+                            </SelectItem>
+                            <SelectItem value="viewer">
+                              <div className="flex items-center gap-2">
+                                <FaEye className="h-3 w-3 text-gray-500" />
+                                <span>Viewer</span>
+                              </div>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-9 px-3 text-yellow-600 hover:text-yellow-700 hover:bg-yellow-50 dark:text-yellow-400 dark:hover:bg-yellow-900/20"
+                          onClick={() =>
+                            handleTransferOwnership(member.userId, member.username)
+                          }
+                          disabled={updatingMemberId === member.id}
+                          title={`Transfer ownership to ${member.username}`}
+                        >
+                          <FaCrown className="h-3 w-3" />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-9 w-9 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
+                          onClick={() =>
+                            handleRemoveMember(member.id, member.username)
+                          }
+                          disabled={updatingMemberId === member.id}
+                          aria-label={`Remove ${member.username}`}
+                        >
+                          <FaTrash className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <Badge variant="outline" className="ml-2">
+                        Room Owner
+                      </Badge>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Action Confirmation Dialog */}
         {selectedItem && action && (
