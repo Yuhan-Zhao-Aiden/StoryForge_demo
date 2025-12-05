@@ -77,3 +77,59 @@ export async function POST(req: NextRequest, context: RouteContext) {
     return NextResponse.json({ error: "Failed to create invite" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const db = await getDb();
+  const roomId = await getRoomIdFromContext(context);
+  const roomObjId = new ObjectId(roomId);
+
+  const userIdObj = new ObjectId(user.id);
+  const userRole = await getUserRoomRole(db, roomObjId, userIdObj);
+  if (!userRole || !hasPermission(userRole, "INVITE_COLLABORATORS")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Disable all active invites for this room
+  await db.collection("roomInvites").updateMany(
+    { roomId: roomObjId, disabled: false },
+    { $set: { disabled: true } }
+  );
+
+  return NextResponse.json({ success: true });
+}
+
+export async function GET(req: NextRequest, context: RouteContext) {
+  const user = await getCurrentUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const db = await getDb();
+  const roomId = await getRoomIdFromContext(context);
+  const roomObjId = new ObjectId(roomId);
+
+  const userIdObj = new ObjectId(user.id);
+  const userRole = await getUserRoomRole(db, roomObjId, userIdObj);
+  if (!userRole || !hasPermission(userRole, "INVITE_COLLABORATORS")) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Only return active invites with a non-empty code
+  const docs = await db.collection("roomInvites")
+    .find({ roomId: roomObjId, disabled: false, codePlain: { $exists: true, $ne: "" } })
+    .sort({ createdAt: -1 })
+    .toArray();
+
+  const invites = docs.map(d => ({
+    code: d.codePlain,
+    role: d.role,
+    disabled: !!d.disabled,
+    expiresAt: d.expiresAt ?? null,
+    createdAt: d.createdAt,
+    uses: d.uses ?? 0,
+    maxUses: d.maxUses ?? null,
+  }));
+
+  return NextResponse.json({ invites });
+}
