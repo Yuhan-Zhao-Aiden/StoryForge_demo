@@ -81,16 +81,30 @@ export async function POST(req: NextRequest, ctx: { params: Promise<Params> }) {
       { $set: { role: "editor", updatedAt: new Date() } }
     );
 
-    await logActivity(db, roomIdObj, userIdObj, newOwnerIdObj, "role_changed", {
-      from: newOwnerMembership.role,
-      to: "owner",
-      ownershipTransfer: true,
+    await logActivity({
+      db,
+      roomId: roomIdObj,
+      actorId: userIdObj,
+      userId: newOwnerIdObj,
+      type: "role_changed",
+      details: {
+        from: newOwnerMembership.role,
+        to: "owner",
+        ownershipTransfer: true,
+      },
     });
 
-    await logActivity(db, roomIdObj, userIdObj, userIdObj, "role_changed", {
-      from: "owner",
-      to: "editor",
-      ownershipTransfer: true,
+    await logActivity({
+      db,
+      roomId: roomIdObj,
+      actorId: userIdObj,
+      userId: userIdObj,
+      type: "role_changed",
+      details: {
+        from: "owner",
+        to: "editor",
+        ownershipTransfer: true,
+      },
     });
 
     return NextResponse.json({

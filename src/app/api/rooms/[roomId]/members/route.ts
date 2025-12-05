@@ -127,8 +127,15 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<Params> })
       return NextResponse.json({ error: "Failed to remove member" }, { status: 500 });
     }
 
-    await logActivity(db, roomIdObj, userIdObj, memberToRemove.userId, "member_removed", {
-      removedRole: memberToRemove.role,
+    await logActivity({
+      db,
+      roomId: roomIdObj,
+      actorId: userIdObj,
+      userId: memberToRemove.userId,
+      type: "member_removed",
+      details: {
+        removedRole: memberToRemove.role,
+      },
     });
 
     const nonOwnerCount = await db

@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { LogOut, LayoutDashboard, BookPlus } from 'lucide-react'
+import { LogOut, LayoutDashboard } from 'lucide-react'
 
 interface UserMenuProps {
   username?: string | null

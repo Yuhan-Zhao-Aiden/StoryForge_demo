@@ -1,13 +1,20 @@
 import OpenAI from "openai";
 import type { ContentGenerationRequest, ContentGenerationResponse } from "./types/editor";
 
-if (!process.env.OPENAI_API_KEY) {
-  throw new Error("OPENAI_API_KEY is not set in environment variables");
-}
+// Initialize OpenAI client lazily to avoid build-time errors
+let openai: OpenAI | null = null;
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+function getOpenAIClient(): OpenAI {
+  if (!openai) {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OPENAI_API_KEY is not set in environment variables");
+    }
+    openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    });
+  }
+  return openai;
+}
 
 // System prompts for different node types
 const SYSTEM_PROMPTS = {
@@ -74,7 +81,7 @@ export async function generateContent(
     const contextPrompt = buildContextPrompt(request);
     const userPrompt = `${contextPrompt}User request: ${request.prompt}`;
 
-    const completion = await openai.chat.completions.create({
+    const completion = await getOpenAIClient().chat.completions.create({
       model: "gpt-4o-mini", // Cost-effective option, use gpt-4o for higher quality
       messages: [
         { role: "system", content: systemPrompt },
