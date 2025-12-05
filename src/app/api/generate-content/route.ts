@@ -86,13 +86,12 @@ export async function POST(req: NextRequest) {
 
     // 7. Log the generation activity
     if (result.success) {
-      await logActivity(
+      await logActivity({
         db,
         roomId,
-        userId,
-        userId,
-        "room_updated",
-        {
+        actorId: userId,
+        type: "node_updated",
+        details: {
           action: "ai_content_generated",
           nodeId: validatedRequest.nodeId,
           nodeTitle: node.title,
@@ -101,8 +100,8 @@ export async function POST(req: NextRequest) {
           generationTimeMs,
           nodeType: validatedRequest.nodeType,
           userRole: role,
-        }
-      );
+        },
+      });
     } else {
       // Log failed generation attempts
       console.error("AI generation failed:", {

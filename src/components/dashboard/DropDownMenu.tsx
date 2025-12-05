@@ -147,9 +147,17 @@ export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
           }
         />
 
-        <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-          <ActivityLog roomId={room._id} />
-        </DropdownMenuItem>
+        {/* Activity Log - Only for room owners */}
+        {isOwner && (
+          <ActivityLog
+            roomId={room._id}
+            trigger={
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                📋 Activity Log
+              </DropdownMenuItem>
+            }
+          />
+        )}
 
         {isOwner && (
           <>

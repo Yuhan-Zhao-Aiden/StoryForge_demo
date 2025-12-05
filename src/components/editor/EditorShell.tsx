@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -65,6 +66,7 @@ type EditorShellProps = {
 };
 
 export function EditorShell({ room }: EditorShellProps) {
+  const router = useRouter();
   const canEdit = room.role === "owner" || room.role === "editor";
   const nodes = useStoryGraphStore((state) => state.nodes);
   const edges = useStoryGraphStore((state) => state.edges);
@@ -73,6 +75,7 @@ export function EditorShell({ room }: EditorShellProps) {
   const isMobile = useMediaQuery("(max-width: 1023px)");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileNodeDialogOpen, setMobileNodeDialogOpen] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
@@ -346,6 +349,41 @@ export function EditorShell({ room }: EditorShellProps) {
     deleteNode(selectedNode.id);
   }, [selectedNode, canEdit, deleteNode]);
 
+  const handleSaveDraft = useCallback(async () => {
+    if (!canEdit) return;
+    
+    setSavingDraft(true);
+    try {
+      // Save any pending node changes if a node is selected
+      if (selectedNode) {
+        await updateNode(selectedNode.id, {
+          title: nodeTitle || "Untitled Node",
+          color: nodeColor,
+          content: {
+            ...(selectedNode.data.content ?? {}),
+            text: nodeContent,
+            media: [
+              ...(selectedNode.data.content?.media?.filter(
+                (media) => media.type !== "image"
+              ) ?? []),
+              ...(nodeMedia ? [nodeMedia] : []),
+            ],
+            generatedBy: selectedNode.data.content?.generatedBy ?? "user",
+          },
+        });
+      }
+      
+      // Small delay to ensure all saves complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Navigate to dashboard
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Failed to save draft:", error);
+      setSavingDraft(false);
+    }
+  }, [canEdit, selectedNode, nodeTitle, nodeColor, nodeContent, nodeMedia, updateNode, router]);
+
   return (
     <ReactFlowProvider>
       <div className="flex h-screen max-h-[calc(100vh-4rem)] flex-col bg-background text-foreground">
@@ -392,9 +430,10 @@ export function EditorShell({ room }: EditorShellProps) {
               type="button"
               size="sm"
               className="uppercase"
-              disabled={!canEdit}
+              disabled={!canEdit || savingDraft}
+              onClick={handleSaveDraft}
             >
-              Save draft
+              {savingDraft ? "Saving..." : "Save draft"}
             </Button>
           </div>
           
@@ -461,6 +500,21 @@ export function EditorShell({ room }: EditorShellProps) {
                     />
                   </div>
                 )}
+                
+                {/* Save Draft Button for Mobile */}
+                <div className="pt-4 border-t border-border">
+                  <Button
+                    type="button"
+                    className="w-full uppercase"
+                    disabled={!canEdit || savingDraft}
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleSaveDraft();
+                    }}
+                  >
+                    {savingDraft ? "Saving..." : "Save Draft & Exit"}
+                  </Button>
+                </div>
               </div>
             </SheetContent>
           </Sheet>

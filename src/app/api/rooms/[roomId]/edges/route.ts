@@ -10,6 +10,7 @@ import {
   StoryEdge,
   objectIdSchema,
 } from "@/lib/types/editor";
+import { logActivity } from "@/lib/activityLogger";
 
 type EdgeDocument = {
   _id: ObjectId;
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const access = await requireRoomAccess(roomId, { requireWrite: true });
   if (!access.ok) return access.response;
 
-  const { db, roomId: roomObjectId } = access.context;
+  const { db, roomId: roomObjectId, userId } = access.context;
   const body = await req.json().catch(() => null);
   if (!body) return jsonError(400, "Invalid JSON body");
 
@@ -158,6 +159,22 @@ export async function POST(req: NextRequest, context: RouteContext) {
   const docs = parsed.edges.map((edge) => buildInsertDocument(edge, roomObjectId, now));
 
   await db.collection("edges").insertMany(docs);
+
+  // Log activity for each created edge
+  for (const doc of docs) {
+    await logActivity({
+      db,
+      roomId: roomObjectId,
+      actorId: userId,
+      type: "edge_created",
+      details: {
+        edgeId: doc._id.toString(),
+        sourceNodeId: doc.fromNodeId.toString(),
+        targetNodeId: doc.toNodeId.toString(),
+        edgeType: doc.type,
+      },
+    });
+  }
 
   return jsonSuccess(
     {
@@ -217,7 +234,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
   const access = await requireRoomAccess(roomId, { requireWrite: true });
   if (!access.ok) return access.response;
 
-  const { db, roomId: roomObjectId } = access.context;
+  const { db, roomId: roomObjectId, userId } = access.context;
   const body = await req.json().catch(() => null);
   if (!body) return jsonError(400, "Invalid JSON body");
 
@@ -230,10 +247,30 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
 
   const ids = parsed.ids.map((id) => new ObjectId(id));
 
+  // Get edge info before deletion for logging
+  const edgesToDelete = await db.collection("edges")
+    .find<EdgeDocument>({ _id: { $in: ids }, roomId: roomObjectId })
+    .toArray();
+
   const result = await db.collection("edges").deleteMany({
     _id: { $in: ids },
     roomId: roomObjectId,
   });
+
+  // Log activity for each deleted edge
+  for (const edge of edgesToDelete) {
+    await logActivity({
+      db,
+      roomId: roomObjectId,
+      actorId: userId,
+      type: "edge_deleted",
+      details: {
+        edgeId: edge._id.toString(),
+        sourceNodeId: edge.fromNodeId.toString(),
+        targetNodeId: edge.toNodeId.toString(),
+      },
+    });
+  }
 
   return jsonSuccess({
     deletedEdges: result.deletedCount ?? 0,

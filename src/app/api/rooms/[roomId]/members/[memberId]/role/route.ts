@@ -94,9 +94,16 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<Params> }) 
       return NextResponse.json({ error: "Failed to update role" }, { status: 500 });
     }
 
-    await logActivity(db, roomIdObj, userIdObj, member.userId, "role_changed", {
-      from: currentRole,
-      to: newRole,
+    await logActivity({
+      db,
+      roomId: roomIdObj,
+      actorId: userIdObj,
+      userId: member.userId,
+      type: "role_changed",
+      details: {
+        from: currentRole,
+        to: newRole,
+      },
     });
 
     const updatedMember = await db

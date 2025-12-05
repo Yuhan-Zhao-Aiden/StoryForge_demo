@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getCurrentUser } from "@/lib/auth";
 import { connectDB } from "@/lib/database";
-import { getUserRoomRole, hasPermission } from "@/lib/permissions";
+import { getUserRoomRole } from "@/lib/permissions";
 
 type Params = { roomId: string };
 
-export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
+export async function GET(req: NextRequest, ctx: { params: Promise<Params> }) {
   try {
     const user = await getCurrentUser();
     if (!user?.id) {
@@ -22,17 +22,40 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
     const userIdObj = new ObjectId(user.id);
     const db = await connectDB();
 
+    // Only owners can view the activity log
     const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
-    if (!userRole || !hasPermission(userRole, "VIEW_ROOM")) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    if (userRole !== "owner") {
+      return NextResponse.json(
+        { error: "Only room owners can view the activity log" },
+        { status: 403 }
+      );
     }
+
+    // Get query parameters for pagination
+    const { searchParams } = new URL(req.url);
+    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
+    const page = Math.max(parseInt(searchParams.get("page") || "1"), 1);
+    const skip = (page - 1) * limit;
+    const typeFilter = searchParams.get("type"); // Optional filter by activity type
+
+    // Build match query
+    const matchQuery: any = { roomId: roomIdObj };
+    if (typeFilter) {
+      matchQuery.type = typeFilter;
+    }
+
+    // Get total count for pagination
+    const totalCount = await db
+      .collection("activityLogs")
+      .countDocuments(matchQuery);
 
     const activities = await db
       .collection("activityLogs")
       .aggregate([
-        { $match: { roomId: roomIdObj } },
+        { $match: matchQuery },
         { $sort: { timestamp: -1 } },
-        { $limit: 50 },
+        { $skip: skip },
+        { $limit: limit },
         {
           $lookup: {
             from: "users",
@@ -49,8 +72,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
             as: "user",
           },
         },
+        {
+          $lookup: {
+            from: "nodes",
+            localField: "details.nodeId",
+            foreignField: "_id",
+            as: "node",
+          },
+        },
         { $unwind: { path: "$actor", preserveNullAndEmptyArrays: true } },
         { $unwind: { path: "$user", preserveNullAndEmptyArrays: true } },
+        { $unwind: { path: "$node", preserveNullAndEmptyArrays: true } },
         {
           $project: {
             _id: 1,
@@ -58,7 +90,10 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
             details: 1,
             timestamp: 1,
             actorUsername: "$actor.username",
+            actorEmail: "$actor.email",
             username: "$user.username",
+            userEmail: "$user.email",
+            nodeTitle: "$node.title",
           },
         },
       ])
@@ -71,8 +106,17 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
         details: a.details,
         timestamp: a.timestamp,
         actorUsername: a.actorUsername,
+        actorEmail: a.actorEmail,
         username: a.username,
+        userEmail: a.userEmail,
+        nodeTitle: a.nodeTitle,
       })),
+      pagination: {
+        total: totalCount,
+        page,
+        limit,
+        totalPages: Math.ceil(totalCount / limit),
+      },
     });
   } catch (err) {
     console.error("GET /api/rooms/[roomId]/activity error:", err);
