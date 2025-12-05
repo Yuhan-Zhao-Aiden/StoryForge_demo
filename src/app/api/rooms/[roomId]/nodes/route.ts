@@ -83,21 +83,40 @@ async function getRoomIdFromContext(context: RouteContext) {
   return params.roomId;
 }
 
-export async function GET(_req: NextRequest, context: RouteContext) {
+export async function GET(req: NextRequest, context: RouteContext) {
   const roomId = await getRoomIdFromContext(context);
   const access = await requireRoomAccess(roomId);
   if (!access.ok) return access.response;
 
   const { db, roomId: roomObjectId } = access.context;
 
+  // Support incremental sync with 'since' parameter
+  const url = new URL(req.url);
+  const sinceParam = url.searchParams.get('since');
+  
+  const query: any = { roomId: roomObjectId };
+  
+  // If 'since' provided, only get nodes updated after that timestamp
+  if (sinceParam) {
+    try {
+      const sinceDate = new Date(sinceParam);
+      if (!isNaN(sinceDate.getTime())) {
+        query.updatedAt = { $gt: sinceDate };
+      }
+    } catch (e) {
+      // Invalid date, ignore and return all
+    }
+  }
+
   const nodes = await db
     .collection<NodeDocument>("nodes")
-    .find({ roomId: roomObjectId })
+    .find(query)
     .sort({ createdAt: 1 })
     .toArray();
 
   return jsonSuccess({
     nodes: nodes.map(mapNodeDocument),
+    serverTime: new Date().toISOString(),
   });
 }
 
