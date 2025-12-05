@@ -39,6 +39,7 @@ import {
 import type { StoryEdge, StoryNode, MediaItem } from "@/lib/types/editor";
 import { Input } from "@/components/ui/input";
 import { useStoryGraphActions } from "@/hooks/useStoryGraphActions";
+import { useCollaborativeSync } from "@/hooks/useCollaborativeSync";
 import StoryNodeCard from "@/components/editor/StoryNodeCard";
 import { NodeImageManager } from "@/components/editor/NodeImageManager";
 import { AIContentEditor } from "@/components/editor/AIContentEditor";
@@ -110,6 +111,12 @@ export function EditorShell({ room }: EditorShellProps) {
     error: actionError,
     clearError,
   } = useStoryGraphActions(room.id, canEdit);
+
+  // Enable collaborative syncing after initial load
+  const { isPolling, lastSync, error: syncError, syncStopped } = useCollaborativeSync({
+    roomId: room.id,
+    enabled: !loading && canEdit, // Only sync after initial load and if user can edit
+  });
 
   const loadGraph = useCallback(async () => {
     setLoading(true);
@@ -556,6 +563,33 @@ export function EditorShell({ room }: EditorShellProps) {
                 />
                 <Controls position="top-right" />
                 <Background gap={24} />
+                
+                {/* Sync status indicator - bottom left */}
+                {canEdit && lastSync && !loading && (
+                  <div className="absolute bottom-4 left-4 flex items-center gap-2 rounded-md border border-border bg-background/95 px-3 py-1.5 text-xs shadow-sm backdrop-blur-sm">
+                    {syncStopped ? (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-destructive" />
+                        <span className="text-muted-foreground">Sync stopped</span>
+                      </>
+                    ) : syncError ? (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                        <span className="text-muted-foreground">Sync error</span>
+                      </>
+                    ) : isPolling ? (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
+                        <span className="text-muted-foreground">Syncing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="h-2 w-2 rounded-full bg-green-500" />
+                        <span className="text-muted-foreground">Synced</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </ReactFlow>
               {loading ? (
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-md bg-background/80 text-sm text-muted-foreground">
