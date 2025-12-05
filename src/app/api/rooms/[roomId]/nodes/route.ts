@@ -93,7 +93,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const url = new URL(req.url);
   const sinceParam = url.searchParams.get('since');
   
-  let query: any = { roomId: roomObjectId };
+  const query: any = { roomId: roomObjectId };
   
   // If 'since' provided, only get nodes updated after that timestamp
   if (sinceParam) {
