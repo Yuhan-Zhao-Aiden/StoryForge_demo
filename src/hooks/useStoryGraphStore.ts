@@ -50,6 +50,11 @@ type StoryGraphState = {
     edges: StoryEdge[];
     viewport?: GraphViewport;
   }) => void;
+  mergeRemoteUpdates: (payload: {
+    nodes: StoryNode[];
+    edges: StoryEdge[];
+    excludeNodeIds?: string[];
+  }) => void;
   applyNodeChanges: (changes: StoryNodeChange[]) => void;
   applyEdgeChanges: (changes: StoryEdgeChange[]) => void;
   connect: (connection: Connection) => void;
@@ -246,6 +251,29 @@ export const useStoryGraphStore = create<StoryGraphState>()((set, get) => ({
       edges: edges.map((edge) => toFlowEdge(edge)),
       viewport: toFlowViewport(viewport),
       dirty: false,
+    });
+  },
+
+  mergeRemoteUpdates: ({ nodes: remoteNodes, edges: remoteEdges, excludeNodeIds = [] }) => {
+    set((state) => {
+      const nodeMap = new Map(state.nodes.map((n) => [n.id, n]));
+      const edgeMap = new Map(state.edges.map((e) => [e.id, e]));
+
+      remoteNodes.forEach((remoteNode) => {
+        if (!excludeNodeIds.includes(remoteNode.id)) {
+          nodeMap.set(remoteNode.id, toFlowNode(remoteNode));
+        }
+      });
+
+      remoteEdges.forEach((remoteEdge) => {
+        edgeMap.set(remoteEdge.id, toFlowEdge(remoteEdge));
+      });
+
+      return {
+        ...state,
+        nodes: Array.from(nodeMap.values()),
+        edges: Array.from(edgeMap.values()),
+      };
     });
   },
 
