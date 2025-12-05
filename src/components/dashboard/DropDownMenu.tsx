@@ -21,6 +21,8 @@ import { useDeleteRoom } from "@/hooks/useDeleteRoom";
 import { useLeaveRoom } from "@/hooks/useLeaveRoom"; 
 import { ForkDialog } from "./ForkDialog";
 import { BranchesDialog } from "./BranchesDialog";
+import { RoomSettingsDialog } from "./RoomSettingsDialog"; 
+
 type Story = {
   _id: string;
   title: string;
@@ -110,6 +112,20 @@ export function StoryMenu({ room, invitable = true }: StoryMenuProps) {
       <DropdownMenuContent className="min-w-[200px]" align="end">
         <DropdownMenuLabel>{isOwner ? "My Story" : "Story Actions"}</DropdownMenuLabel>
         <DropdownMenuSeparator />
+
+        {isOwner && (
+          <>
+            <RoomSettingsDialog
+              roomId={room._id}
+              trigger={
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
+                  Room Settings
+                </DropdownMenuItem>
+              }
+            />
+            <DropdownMenuSeparator />
+          </>
+        )}
 
         {invitable && isOwner && (
           <GenerateInvite
