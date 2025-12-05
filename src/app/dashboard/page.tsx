@@ -11,6 +11,7 @@ import { FaUserGroup, FaChartLine } from "react-icons/fa6";
 
 import StatCard from "@/components/dashboard/StatCard";
 import StoryRow from "@/components/dashboard/StoryRow";
+import { UserMenu } from "@/components/dashboard/UserMenu";
 
 // server-side deps
 import { getCurrentUser } from "@/lib/auth";
@@ -207,14 +208,16 @@ export default async function DashboardPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* <Button variant="secondary">Join Session</Button> */}
-          {/* <Button>+ Create New Story</Button> */}
-          {/* ADD NOTIFICATIONS BUTTON HERE */}
+          {/* Notifications */}
           <Notifications />
+          {/* Join Session */}
           <RedeemInvite
             trigger={<Button variant="secondary">Join Session</Button>}
           />
+          {/* Create Story */}
           <NewStoryDialog />
+          {/* User Menu with Logout */}
+          <UserMenu username={user.username} email={user.email} />
         </div>
       </div>
 

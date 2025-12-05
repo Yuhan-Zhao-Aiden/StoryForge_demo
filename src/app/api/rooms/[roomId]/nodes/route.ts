@@ -12,6 +12,7 @@ import {
   objectIdSchema,
 } from "@/lib/types/editor";
 import { deleteNodeImages } from "@/lib/gridfs";
+import { logActivity } from "@/lib/activityLogger";
 
 type NodeDocument = {
   _id: ObjectId;
@@ -171,6 +172,21 @@ export async function POST(req: NextRequest, context: RouteContext) {
 
   await db.collection("nodes").insertMany(docs);
 
+  // Log activity for each created node
+  for (const doc of docs) {
+    await logActivity({
+      db,
+      roomId: roomObjectId,
+      actorId: userId,
+      type: "node_created",
+      details: {
+        nodeId: doc._id.toString(),
+        nodeTitle: doc.title,
+        nodeType: doc.type,
+      },
+    });
+  }
+
   const insertedNodes = docs.map((doc) => mapNodeDocument({ ...doc, _id: doc._id }));
 
   return jsonSuccess(
@@ -190,7 +206,7 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
   const access = await requireRoomAccess(roomId, { requireWrite: true });
   if (!access.ok) return access.response;
 
-  const { db, roomId: roomObjectId } = access.context;
+  const { db, roomId: roomObjectId, userId } = access.context;
   const body = await req.json().catch(() => null);
   if (!body) return jsonError(400, "Invalid JSON body");
 
@@ -226,6 +242,22 @@ export async function PATCH(req: NextRequest, context: RouteContext) {
     .find<NodeDocument>({ _id: { $in: ids }, roomId: roomObjectId })
     .toArray();
 
+  // Log activity for each updated node
+  for (const update of parsed.updates) {
+    const updatedNode = updatedNodes.find(n => n._id.toString() === update.id);
+    await logActivity({
+      db,
+      roomId: roomObjectId,
+      actorId: userId,
+      type: "node_updated",
+      details: {
+        nodeId: update.id,
+        nodeTitle: updatedNode?.title || update.title,
+        changes: Object.keys(update).filter(k => k !== 'id'),
+      },
+    });
+  }
+
   return jsonSuccess({
     nodes: updatedNodes.map(mapNodeDocument),
   });
@@ -236,7 +268,7 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
   const access = await requireRoomAccess(roomId, { requireWrite: true });
   if (!access.ok) return access.response;
 
-  const { db, roomId: roomObjectId } = access.context;
+  const { db, roomId: roomObjectId, userId } = access.context;
   const body = await req.json().catch(() => null);
   if (!body) return jsonError(400, "Invalid JSON body");
 
@@ -254,6 +286,12 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
   const nodesCollection = db.collection("nodes");
   const edgesCollection = db.collection("edges");
 
+  // Get node titles before deletion for logging
+  const nodesToDelete = await nodesCollection
+    .find<NodeDocument>({ _id: { $in: ids }, roomId: roomObjectId })
+    .project({ _id: 1, title: 1, type: 1 })
+    .toArray();
+
   // Delete associated GridFS images for each node
   const imageCleanupPromises = parsed.ids.map((nodeId) => 
     deleteNodeImages(nodeId).catch((error) => {
@@ -270,6 +308,21 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     }),
     Promise.all(imageCleanupPromises),
   ]);
+
+  // Log activity for each deleted node
+  for (const node of nodesToDelete) {
+    await logActivity({
+      db,
+      roomId: roomObjectId,
+      actorId: userId,
+      type: "node_deleted",
+      details: {
+        nodeId: node._id.toString(),
+        nodeTitle: node.title,
+        nodeType: node.type,
+      },
+    });
+  }
 
   const totalImagesDeleted = imageCounts.reduce((sum, count) => sum + count, 0);
 

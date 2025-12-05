@@ -418,26 +418,331 @@
 
 /* Responsive design */
 @media (max-width: 768px) {
+  .auth-container {
+    padding: 16px;
+    align-items: flex-start;
+    padding-top: 40px;
+  }
+
   .auth-card {
-    margin: 20px;
-    padding: 32px 24px;
-    border-radius: 16px;
-    max-height: 85vh;
+    margin: 0 auto;
+    padding: 28px 20px;
+    border-radius: 20px;
+    max-width: 100%;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
   }
   
-  .brand-name {
+  .logo-section {
+    margin-bottom: 28px;
+  }
+
+  .logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+  }
+
+  .logo-icon {
     font-size: 28px;
+  }
+
+  .brand-name {
+    font-size: 26px;
+    margin-bottom: 6px;
+  }
+
+  .brand-tagline {
+    font-size: 14px;
+    margin-bottom: 6px;
+  }
+
+  .auth-subtitle {
+    font-size: 13px;
   }
   
   .floating-node {
     display: none;
   }
+
+  .connection-line {
+    display: none;
+  }
+
+  .form-group {
+    margin-bottom: 18px;
+  }
+
+  .form-label {
+    font-size: 13px;
+    margin-bottom: 6px;
+  }
+
+  .form-options {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+
+  .terms-section {
+    margin-bottom: 18px;
+  }
+
+  .checkbox-label {
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .checkbox-group {
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .auth-btn {
+    padding: 14px;
+    font-size: 15px;
+    border-radius: 10px;
+  }
+
+  .link-section {
+    padding-top: 18px;
+    font-size: 14px;
+  }
+
+  .message {
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
 }
 
 @media (max-width: 480px) {
+  .auth-container {
+    padding: 12px;
+    padding-top: 24px;
+  }
+
+  .auth-card {
+    padding: 24px 16px;
+    border-radius: 16px;
+  }
+
+  .logo {
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
+  }
+
+  .logo-icon {
+    font-size: 24px;
+  }
+
+  .brand-name {
+    font-size: 22px;
+  }
+
+  .brand-tagline {
+    font-size: 13px;
+  }
+
   .form-input {
     padding: 14px 16px;
     font-size: 16px; /* Prevents zoom on iOS */
+    border-radius: 10px;
+  }
+
+  .form-label {
+    font-size: 12px;
+  }
+
+  .password-toggle {
+    right: 12px;
+    font-size: 16px;
+  }
+
+  .checkbox {
+    width: 16px;
+    height: 16px;
+  }
+
+  .checkbox-label {
+    font-size: 12px;
+  }
+
+  .auth-btn {
+    padding: 12px;
+    font-size: 14px;
+  }
+
+  .link-section {
+    font-size: 13px;
+  }
+
+  .strength-text {
+    font-size: 11px;
+  }
+}
+
+/* Extra small devices */
+@media (max-width: 360px) {
+  .auth-card {
+    padding: 20px 14px;
+  }
+
+  .logo-section {
+    margin-bottom: 24px;
+  }
+
+  .brand-name {
+    font-size: 20px;
+  }
+
+  .brand-tagline {
+    font-size: 12px;
+  }
+
+  .form-input {
+    padding: 12px 14px;
+  }
+
+  .form-options {
+    gap: 10px;
+  }
+}
+
+/* Landscape mode on mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+  .auth-container {
+    padding: 12px;
+    padding-top: 12px;
+    align-items: center;
+  }
+
+  .auth-card {
+    padding: 20px 24px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .logo-section {
+    margin-bottom: 16px;
+  }
+
+  .logo {
+    width: 48px;
+    height: 48px;
+  }
+
+  .logo-icon {
+    font-size: 20px;
+  }
+
+  .brand-name {
+    font-size: 20px;
+  }
+
+  .brand-tagline {
+    display: none;
+  }
+
+  .auth-subtitle {
+    display: none;
+  }
+
+  .form-group {
+    margin-bottom: 12px;
+  }
+}
+
+/* Safe area insets for notched devices (iPhone X+) */
+@supports (padding: max(0px)) {
+  .auth-container {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: max(20px, env(safe-area-inset-bottom));
+  }
+}
+
+/* Reduced motion preference for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .floating-node,
+  .connection-line,
+  .logo::before,
+  .animate-float,
+  .animate-bounce,
+  .animate-blob,
+  .animate-fade-in-out,
+  .animate-gradient {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .auth-card {
+    animation: none;
+  }
+
+  .auth-btn:hover {
+    transform: none;
+  }
+}
+
+/* Better focus states for accessibility */
+.form-input:focus-visible,
+.auth-btn:focus-visible,
+.checkbox:focus-visible {
+  outline: 3px solid #667eea;
+  outline-offset: 2px;
+}
+
+.forgot-password:focus-visible,
+.link-section a:focus-visible,
+.checkbox-label a:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Minimum touch target size (44px) */
+.password-toggle {
+  min-width: 44px;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.checkbox {
+  min-width: 20px;
+  min-height: 20px;
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .auth-card {
+    border: 2px solid #000;
+  }
+
+  .form-input {
+    border: 2px solid #000;
+  }
+
+  .auth-btn {
+    border: 2px solid #000;
+  }
+}
+
+/* Dark mode adjustments for auth pages */
+@media (prefers-color-scheme: dark) {
+  .message.success {
+    background: #064e3b;
+    color: #a7f3d0;
+    border-color: #10b981;
+  }
+
+  .message.error {
+    background: #7f1d1d;
+    color: #fecaca;
+    border-color: #dc2626;
   }
 }
 
@@ -685,4 +990,97 @@
 
 .magical-button:hover::before {
   left: 100%;
+}
+
+/* ===== HOMEPAGE RESPONSIVE ENHANCEMENTS ===== */
+
+/* Safe area padding utility for bottom */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Landscape mode for homepage */
+@media (max-height: 500px) and (orientation: landscape) {
+  .animate-bounce {
+    animation: none !important;
+  }
+}
+
+/* Reduced motion for homepage */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in-out,
+  .animate-gradient,
+  .animate-glow,
+  .animate-float,
+  .animate-sparkle,
+  .animate-blob {
+    animation: none !important;
+  }
+  
+  .story-card:hover {
+    transform: none;
+  }
+  
+  .magical-button::before {
+    display: none;
+  }
+}
+
+/* Better hover states on touch devices */
+@media (hover: none) and (pointer: coarse) {
+  .group:hover {
+    transform: none !important;
+  }
+  
+  .hover\:scale-105:hover,
+  .hover\:scale-110:hover,
+  .md\:hover\:scale-105:hover,
+  .md\:hover\:scale-110:hover {
+    transform: none !important;
+  }
+  
+  .hover\:-translate-y-1:hover,
+  .hover\:-translate-y-2:hover,
+  .md\:hover\:-translate-y-1:hover,
+  .md\:hover\:-translate-y-2:hover {
+    transform: none !important;
+  }
+}
+
+/* Smooth scroll behavior */
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Fix for iOS bounce scroll */
+@supports (-webkit-touch-callout: none) {
+  body {
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Print styles - hide decorative elements */
+@media print {
+  .animate-float,
+  .animate-blob,
+  .floating-node,
+  .connection-line,
+  .bg-animation {
+    display: none !important;
+  }
+  
+  .auth-container {
+    background: white !important;
+  }
+  
+  .auth-card {
+    box-shadow: none !important;
+    border: 1px solid #ccc !important;
+  }
 }
