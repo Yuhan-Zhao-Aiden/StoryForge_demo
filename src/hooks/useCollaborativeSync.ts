@@ -13,6 +13,8 @@ interface SyncResponse {
   nodes: any[];
   edges: any[];
   serverTime: string;
+  deletedNodeIds?: string[];
+  deletedEdgeIds?: string[];
 }
 
 /**
@@ -22,10 +24,11 @@ interface SyncResponse {
 export function useCollaborativeSync({ 
   roomId, 
   enabled = true,
-  pollInterval = 5000, // 5 seconds default
+  pollInterval = 2000, // 2 seconds default for better real-time feel
 }: UseSyncOptions) {
   const mergeRemoteUpdates = useStoryGraphStore((state) => state.mergeRemoteUpdates);
   const selectedNodeIds = useStoryGraphStore((state) => state.selectedNodeIds);
+  const nodes = useStoryGraphStore((state) => state.nodes);
   
   const [isPolling, setIsPolling] = useState(false);
   const [lastSync, setLastSync] = useState<string | null>(null);
@@ -39,6 +42,7 @@ export function useCollaborativeSync({
   // Store latest values in refs to avoid recreating fetchUpdates
   const lastSyncRef = useRef<string | null>(null);
   const selectedNodeIdsRef = useRef<string[]>([]);
+  const nodesRef = useRef(nodes);
   const mergeRemoteUpdatesRef = useRef(mergeRemoteUpdates);
   
   const MAX_FAILED_ATTEMPTS = 3;
@@ -51,6 +55,10 @@ export function useCollaborativeSync({
   useEffect(() => {
     selectedNodeIdsRef.current = selectedNodeIds;
   }, [selectedNodeIds]);
+  
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
   
   useEffect(() => {
     mergeRemoteUpdatesRef.current = mergeRemoteUpdates;
@@ -83,21 +91,19 @@ export function useCollaborativeSync({
 
       abortControllerRef.current = new AbortController();
 
+      // Use incremental sync with deletion tracking
       const currentLastSync = lastSyncRef.current;
-
-      // Build URL with 'since' parameter for incremental sync
-      const url = currentLastSync
-        ? `/api/rooms/${roomId}/nodes?since=${encodeURIComponent(currentLastSync)}`
-        : `/api/rooms/${roomId}/nodes`;
-
+      const sinceParam = currentLastSync ? `?since=${encodeURIComponent(currentLastSync)}` : '';
+      
       const [nodesRes, edgesRes] = await Promise.all([
-        fetch(url, { signal: abortControllerRef.current.signal }),
-        fetch(
-          currentLastSync 
-            ? `/api/rooms/${roomId}/edges?since=${encodeURIComponent(currentLastSync)}`
-            : `/api/rooms/${roomId}/edges`,
-          { signal: abortControllerRef.current.signal }
-        ),
+        fetch(`/api/rooms/${roomId}/nodes${sinceParam}`, { 
+          signal: abortControllerRef.current.signal,
+          cache: 'no-store'
+        }),
+        fetch(`/api/rooms/${roomId}/edges${sinceParam}`, { 
+          signal: abortControllerRef.current.signal,
+          cache: 'no-store'
+        }),
       ]);
 
       if (!nodesRes.ok || !edgesRes.ok) {
@@ -107,19 +113,44 @@ export function useCollaborativeSync({
       const nodesData: SyncResponse = await nodesRes.json();
       const edgesData: SyncResponse = await edgesRes.json();
 
-      const hasChanges = nodesData.nodes.length > 0 || edgesData.edges.length > 0;
+      // Check if there are any changes
+      const hasChanges = 
+        nodesData.nodes.length > 0 || 
+        edgesData.edges.length > 0 ||
+        (nodesData.deletedNodeIds && nodesData.deletedNodeIds.length > 0) ||
+        (edgesData.deletedEdgeIds && edgesData.deletedEdgeIds.length > 0);
 
-      // Merge remote updates, excluding nodes currently being edited
       if (hasChanges) {
+        // Only exclude nodes that are actively being dragged, not just selected
+        // This allows updates from other users even if we have the node selected
+        const draggingIds = nodesRef.current.filter(n => n.dragging).map(n => n.id);
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('[Sync] Merging updates:', {
+            nodes: nodesData.nodes.length,
+            edges: edgesData.edges.length,
+            deletedNodes: nodesData.deletedNodeIds?.length || 0,
+            deletedEdges: edgesData.deletedEdgeIds?.length || 0,
+            excludingDragging: draggingIds,
+            since: currentLastSync,
+            serverTime: nodesData.serverTime
+          });
+        }
+        
         mergeRemoteUpdatesRef.current({
           nodes: nodesData.nodes,
           edges: edgesData.edges,
-          excludeNodeIds: selectedNodeIdsRef.current, // Don't update nodes user is editing
+          excludeNodeIds: draggingIds,
+          deletedNodeIds: nodesData.deletedNodeIds || [],
+          deletedEdgeIds: edgesData.deletedEdgeIds || [],
         });
+      } else if (process.env.NODE_ENV === 'development' && currentLastSync) {
+        console.log('[Sync] No changes since', currentLastSync, '- serverTime:', nodesData.serverTime);
       }
 
-      // Update last sync timestamp and reset failed attempts on success
-      setLastSync(nodesData.serverTime || edgesData.serverTime);
+      // Always update last sync timestamp to server time (even with no changes)
+      // This prevents repeatedly querying the same time range
+      setLastSync(nodesData.serverTime || new Date().toISOString());
       setFailedAttempts(0);
     } catch (err: any) {
       if (err.name === "AbortError") {
