@@ -95,6 +95,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const sinceParam = url.searchParams.get('since');
   
   const query: any = { roomId: roomObjectId };
+  let deletedNodeIds: string[] = [];
   
   // If 'since' provided, only get nodes updated after that timestamp
   if (sinceParam) {
@@ -102,6 +103,19 @@ export async function GET(req: NextRequest, context: RouteContext) {
       const sinceDate = new Date(sinceParam);
       if (!isNaN(sinceDate.getTime())) {
         query.updatedAt = { $gt: sinceDate };
+        
+        // Also fetch deleted node IDs since this timestamp
+        const deletions = await db
+          .collection("deletions")
+          .find({
+            roomId: roomObjectId,
+            type: "node",
+            deletedAt: { $gt: sinceDate },
+          })
+          .project({ entityId: 1 })
+          .toArray();
+        
+        deletedNodeIds = deletions.map((d: any) => d.entityId);
       }
     } catch (e) {
       // Invalid date, ignore and return all
@@ -117,6 +131,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   return jsonSuccess({
     nodes: nodes.map(mapNodeDocument),
     serverTime: new Date().toISOString(),
+    deletedNodeIds,
   });
 }
 
@@ -319,6 +334,8 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     })
   );
 
+  const deletedAt = new Date();
+  
   const [nodesResult, edgesResult, imageCounts] = await Promise.all([
     nodesCollection.deleteMany({ _id: { $in: ids }, roomId: roomObjectId }),
     edgesCollection.deleteMany({
@@ -327,6 +344,20 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     }),
     Promise.all(imageCleanupPromises),
   ]);
+
+  // Record deletion events for sync tracking
+  const deletionsCollection = db.collection("deletions");
+  const deletionDocs = parsed.ids.map((nodeId) => ({
+    roomId: roomObjectId,
+    type: "node",
+    entityId: nodeId,
+    deletedAt,
+    deletedBy: userId,
+  }));
+  
+  if (deletionDocs.length > 0) {
+    await deletionsCollection.insertMany(deletionDocs);
+  }
 
   // Log activity for each deleted node
   for (const node of nodesToDelete) {

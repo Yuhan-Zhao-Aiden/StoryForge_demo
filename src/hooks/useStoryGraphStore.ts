@@ -54,6 +54,8 @@ type StoryGraphState = {
     nodes: StoryNode[];
     edges: StoryEdge[];
     excludeNodeIds?: string[];
+    deletedNodeIds?: string[];
+    deletedEdgeIds?: string[];
   }) => void;
   applyNodeChanges: (changes: StoryNodeChange[]) => void;
   applyEdgeChanges: (changes: StoryEdgeChange[]) => void;
@@ -254,18 +256,95 @@ export const useStoryGraphStore = create<StoryGraphState>()((set, get) => ({
     });
   },
 
-  mergeRemoteUpdates: ({ nodes: remoteNodes, edges: remoteEdges, excludeNodeIds = [] }) => {
+  mergeRemoteUpdates: ({ nodes: remoteNodes, edges: remoteEdges, excludeNodeIds = [], deletedNodeIds = [], deletedEdgeIds = [] }) => {
     set((state) => {
-      const nodeMap = new Map(state.nodes.map((n) => [n.id, n]));
-      const edgeMap = new Map(state.edges.map((e) => [e.id, e]));
+      const excludeSet = new Set(excludeNodeIds);
 
-      remoteNodes.forEach((remoteNode) => {
-        if (!excludeNodeIds.includes(remoteNode.id)) {
-          nodeMap.set(remoteNode.id, toFlowNode(remoteNode));
+      // Create lookup map for existing nodes/edges
+      const existingNodeMap = new Map(state.nodes.map(n => [n.id, n]));
+      const existingEdgeMap = new Map(state.edges.map(e => [e.id, e]));
+
+      // Start with existing nodes/edges (incremental approach)
+      const nodeMap = new Map<string, StoryFlowNode>(existingNodeMap);
+      const edgeMap = new Map<string, StoryFlowEdge>(existingEdgeMap);
+
+      // Remove deleted nodes (unless excluded)
+      deletedNodeIds.forEach((nodeId) => {
+        if (!excludeSet.has(nodeId)) {
+          nodeMap.delete(nodeId);
         }
       });
 
+      // Remove deleted edges
+      deletedEdgeIds.forEach((edgeId) => {
+        edgeMap.delete(edgeId);
+      });
+
+      // Add/update remote nodes (except excluded ones)
+      remoteNodes.forEach((remoteNode) => {
+        if (excludeSet.has(remoteNode.id)) {
+          return; // Skip excluded nodes
+        }
+
+        const existingNode = existingNodeMap.get(remoteNode.id);
+        
+        // Check if node data has changed
+        if (existingNode && !existingNode.dragging) {
+          const hasChanges = 
+            existingNode.data.title !== remoteNode.title ||
+            existingNode.data.updatedAt !== remoteNode.updatedAt ||
+            existingNode.position.x !== remoteNode.position.x ||
+            existingNode.position.y !== remoteNode.position.y ||
+            JSON.stringify(existingNode.data.content) !== JSON.stringify(remoteNode.content);
+
+          if (!hasChanges) {
+            // No changes, keep existing object (prevents re-renders)
+            return;
+          }
+          
+          if (process.env.NODE_ENV === 'development') {
+            console.log(`[Merge] Updating node ${remoteNode.id}:`, {
+              position: `(${existingNode.position.x}, ${existingNode.position.y}) → (${remoteNode.position.x}, ${remoteNode.position.y})`,
+              updatedAt: `${existingNode.data.updatedAt} → ${remoteNode.updatedAt}`
+            });
+          }
+          
+          // Update existing node object to preserve selection/internal state
+          const updatedNode: StoryFlowNode = {
+            ...existingNode,
+            position: { ...remoteNode.position },
+            data: {
+              ...existingNode.data,
+              ...remoteNode,
+              label: remoteNode.title,
+              color: remoteNode.color ?? existingNode.data.color,
+            },
+          };
+          nodeMap.set(remoteNode.id, updatedNode);
+          return;
+        }
+
+        // Create new flow node for new nodes or nodes without existing state
+        nodeMap.set(remoteNode.id, toFlowNode(remoteNode));
+      });
+
+      // Add/update remote edges
       remoteEdges.forEach((remoteEdge) => {
+        const existingEdge = existingEdgeMap.get(remoteEdge.id);
+        
+        // Reuse existing edge object if data hasn't changed
+        if (existingEdge) {
+          const hasChanges = 
+            existingEdge.source !== remoteEdge.source ||
+            existingEdge.target !== remoteEdge.target ||
+            existingEdge.data?.story?.type !== remoteEdge.type;
+
+          if (!hasChanges) {
+            edgeMap.set(remoteEdge.id, existingEdge);
+            return;
+          }
+        }
+
         edgeMap.set(remoteEdge.id, toFlowEdge(remoteEdge));
       });
 

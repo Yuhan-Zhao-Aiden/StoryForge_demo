@@ -110,6 +110,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   const sinceParam = url.searchParams.get('since');
   
   const query: any = { roomId: roomObjectId };
+  let deletedEdgeIds: string[] = [];
   
   // If 'since' provided, only get edges updated after that timestamp
   if (sinceParam) {
@@ -117,6 +118,19 @@ export async function GET(req: NextRequest, context: RouteContext) {
       const sinceDate = new Date(sinceParam);
       if (!isNaN(sinceDate.getTime())) {
         query.updatedAt = { $gt: sinceDate };
+        
+        // Also fetch deleted edge IDs since this timestamp
+        const deletions = await db
+          .collection("deletions")
+          .find({
+            roomId: roomObjectId,
+            type: "edge",
+            deletedAt: { $gt: sinceDate },
+          })
+          .project({ entityId: 1 })
+          .toArray();
+        
+        deletedEdgeIds = deletions.map((d: any) => d.entityId);
       }
     } catch (e) {
       // Invalid date, ignore and return all
@@ -132,6 +146,7 @@ export async function GET(req: NextRequest, context: RouteContext) {
   return jsonSuccess({
     edges: edges.map(mapEdgeDocument),
     serverTime: new Date().toISOString(),
+    deletedEdgeIds,
   });
 }
 
@@ -252,10 +267,26 @@ export async function DELETE(req: NextRequest, context: RouteContext) {
     .find<EdgeDocument>({ _id: { $in: ids }, roomId: roomObjectId })
     .toArray();
 
+  const deletedAt = new Date();
+  
   const result = await db.collection("edges").deleteMany({
     _id: { $in: ids },
     roomId: roomObjectId,
   });
+
+  // Record deletion events for sync tracking
+  const deletionsCollection = db.collection("deletions");
+  const deletionDocs = parsed.ids.map((edgeId) => ({
+    roomId: roomObjectId,
+    type: "edge",
+    entityId: edgeId,
+    deletedAt,
+    deletedBy: userId,
+  }));
+  
+  if (deletionDocs.length > 0) {
+    await deletionsCollection.insertMany(deletionDocs);
+  }
 
   // Log activity for each deleted edge
   for (const edge of edgesToDelete) {
