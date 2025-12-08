@@ -1,13 +1,13 @@
 // src/app/api/auth/verify-reset/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDB } from '@/lib/database'
+import { getDb } from '@/lib/mongodb'
 
 export async function POST(req: NextRequest) {
   try {
     const { email, code } = await req.json()
     if (!email || !code) return NextResponse.json({ ok: false, error: 'Email and code required' }, { status: 400 })
 
-    const db = await connectDB()
+    const db = await getDb()
     const user = await db.collection('users').findOne({ email })
     if (!user) return NextResponse.json({ ok: false, error: 'No user found' }, { status: 404 })
 

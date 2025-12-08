@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { connectDB } from "@/lib/database";
+import { getDb } from "@/lib/mongodb";
 import { getUserRoomRole, hasPermission } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<Params> }) {
     const roomIdObj = new ObjectId(roomId);
     const userIdObj = new ObjectId(user.id);
     const newOwnerIdObj = new ObjectId(body.newOwnerId);
-    const db = await connectDB();
+    const db = await getDb();
 
     const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
     if (userRole !== "owner") {

@@ -1,6 +1,6 @@
 // src/app/api/auth/request-reset/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { connectDB } from '@/lib/database'
+import { getDb } from '@/lib/mongodb'
 import { sendEmail } from '@/lib/email'
 
 export async function POST(req: NextRequest) {
@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
     const { email } = await req.json()
     if (!email) return NextResponse.json({ ok: false, error: 'Email is required' }, { status: 400 })
 
-    const db = await connectDB()
+    const db = await getDb()
     const user = await db.collection('users').findOne({ email })
     if (!user) return NextResponse.json({ ok: false, error: 'No user found with that email' }, { status: 404 })
 

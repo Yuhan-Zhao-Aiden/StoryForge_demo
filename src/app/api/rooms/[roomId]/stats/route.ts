@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { getCurrentUser } from "@/lib/auth";
-import { connectDB } from "@/lib/database";
+import { getDb } from "@/lib/mongodb";
 import { getUserRoomRole, hasPermission } from "@/lib/permissions";
 
 type Params = { roomId: string };
@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
 
     const roomIdObj = new ObjectId(roomId);
     const userIdObj = new ObjectId(user.id);
-    const db = await connectDB();
+    const db = await getDb();
 
     const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
     if (!userRole || !hasPermission(userRole, "VIEW_ROOM")) {

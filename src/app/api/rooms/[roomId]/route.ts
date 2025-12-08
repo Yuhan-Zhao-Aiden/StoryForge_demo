@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
-import { connectDB } from "@/lib/database";     
+import { getDb } from "@/lib/mongodb";     
 import { getCurrentUser } from "@/lib/auth";
 import { getUserRoomRole, hasPermission } from "@/lib/permissions";
 import { deleteRoomImages } from "@/lib/gridfs";   
@@ -24,7 +24,7 @@ export async function DELETE(_req: Request, ctx: { params: Promise<Params> }) {
     const userIdObj = new ObjectId(user.id);
 
     // 3) DB
-    const db = await connectDB();
+    const db = await getDb();
 
     const rooms = db.collection("rooms");
     const nodes = db.collection("nodes");
@@ -113,7 +113,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<Params> }) {
       return NextResponse.json({ error: "Subtitle too long (max 200)" }, { status: 400 });
     }
 
-    const db = await connectDB();
+    const db = await getDb();
     const rooms = db.collection("rooms"); 
 
     const roomIdObj = new ObjectId(roomId);

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { connectDB } from "@/lib/database";
+import { getDb } from "@/lib/mongodb";
 import { hasPermission, getUserRoomRole } from "@/lib/permissions";
 import { logActivity } from "@/lib/activityLogger";
 
@@ -22,7 +22,7 @@ export async function GET(_req: NextRequest, ctx: { params: Promise<Params> }) {
 
     const roomIdObj = new ObjectId(roomId);
     const userIdObj = new ObjectId(user.id);
-    const db = await connectDB();
+    const db = await getDb();
 
     const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
     if (!userRole || !hasPermission(userRole, "VIEW_ROOM")) {
@@ -100,7 +100,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<Params> })
     const roomIdObj = new ObjectId(roomId);
     const userIdObj = new ObjectId(user.id);
     const memberIdObj = new ObjectId(body.memberId);
-    const db = await connectDB();
+    const db = await getDb();
 
     const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
     if (!userRole || !hasPermission(userRole, "REMOVE_COLLABORATORS")) {
