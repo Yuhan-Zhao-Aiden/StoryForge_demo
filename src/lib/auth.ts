@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
 import { ObjectId } from 'mongodb'
 import { cookies } from 'next/headers'
-import { connectDB } from './database'
+import { getDb } from './mongodb'
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback-secret-key'
 
@@ -20,7 +20,7 @@ export interface AuthResult {
 
 export async function register(username: string, email: string, password: string, newsletter: boolean = false): Promise<AuthResult> {
   try {
-    const db = await connectDB()
+    const db = await getDb()
     const users = db.collection('users')
 
     // Check if user already exists
@@ -70,7 +70,7 @@ export async function register(username: string, email: string, password: string
 
 export async function login(email: string, password: string): Promise<AuthResult> {
   try {
-    const db = await connectDB()
+    const db = await getDb()
     const users = db.collection('users')
 
     // Find user by email
@@ -137,7 +137,7 @@ export async function getCurrentUser(): Promise<User | null> {
       return null
     }
 
-    const db = await connectDB()
+    const db = await getDb()
     const users = db.collection('users')
 
     const user = await users.findOne(

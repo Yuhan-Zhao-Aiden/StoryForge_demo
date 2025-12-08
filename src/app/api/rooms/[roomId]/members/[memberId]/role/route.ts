@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
-import { connectDB } from "@/lib/database";
+import { getDb } from "@/lib/mongodb";
 import { 
   getUserRoomRole, 
   hasPermission, 
@@ -48,7 +48,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<Params> }) 
     const roomIdObj = new ObjectId(roomId);
     const userIdObj = new ObjectId(user.id);
     const memberIdObj = new ObjectId(memberId);
-    const db = await connectDB();
+    const db = await getDb();
     const userRole = await getUserRoomRole(db, roomIdObj, userIdObj);
     if (!userRole || !hasPermission(userRole, "MANAGE_ROLES")) {
       return NextResponse.json(

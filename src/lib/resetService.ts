@@ -1,10 +1,10 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { connectDB } from "./database";
+import { getDb } from "./mongodb";
 
 // Step 1: request password reset
 export async function requestPasswordReset(email: string): Promise<string> {
-  const db = await connectDB();
+  const db = await getDb();
   const users = db.collection("users");
 
   const resetCode = crypto.randomBytes(3).toString("hex"); // 6-char code
@@ -30,7 +30,7 @@ export async function resetPassword(
   code: string,
   newPassword: string
 ): Promise<void> {
-  const db = await connectDB();
+  const db = await getDb();
   const users = db.collection("users");
 
   const user = await users.findOne({ email, resetCode: code });
