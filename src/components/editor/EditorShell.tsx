@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ReactFlow,
@@ -287,25 +287,34 @@ export function EditorShell({ room }: EditorShellProps) {
   const [nodeColor, setNodeColor] = useState("#2563eb");
   const [nodeMedia, setNodeMedia] = useState<MediaItem | null>(null);
 
+  const formNodeIdRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!selectedNode) {
-      setNodeTitle("");
-      setNodeContent("");
-      setNodeColor("#2563eb");
-      setNodeMedia(null);
-      return;
-    }
-    setNodeTitle(selectedNode.data.title ?? "");
-    setNodeContent(selectedNode.data.content?.text ?? "");
-    setNodeColor(selectedNode.data.color ?? "#2563eb");
-    const existingImage = selectedNode.data.content?.media?.find(
-      (media) => media.type === "image"
-    );
-    setNodeMedia(existingImage ?? null);
-    
-    // Open mobile dialog when node is selected on mobile
-    if (isMobile) {
-      setMobileNodeDialogOpen(true);
+    const incomingId = selectedNode?.id ?? null;
+
+    if (incomingId !== formNodeIdRef.current) {
+      // Switched to a different node (or deselected) — reset the whole form.
+      formNodeIdRef.current = incomingId;
+
+      if (!selectedNode) {
+        setNodeTitle("");
+        setNodeContent("");
+        setNodeColor("#2563eb");
+        setNodeMedia(null);
+        return;
+      }
+      setNodeTitle(selectedNode.data.title ?? "");
+      setNodeContent(selectedNode.data.content?.text ?? "");
+      setNodeColor(selectedNode.data.color ?? "#2563eb");
+      const existingImage = selectedNode.data.content?.media?.find(
+        (media) => media.type === "image"
+      );
+      setNodeMedia(existingImage ?? null);
+
+      // Open mobile dialog when a node is selected on mobile
+      if (isMobile) {
+        setMobileNodeDialogOpen(true);
+      }
     }
   }, [selectedNode, isMobile]);
 

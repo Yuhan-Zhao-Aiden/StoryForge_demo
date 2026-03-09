@@ -22,32 +22,20 @@ const options: MongoClientOptions = {
   retryReads: true,
 };
 
-let client: MongoClient;
-let clientPromise: Promise<MongoClient>;
-
-if (process.env.NODE_ENV === 'development') {
-  // In development, reuse connection across hot reloads
-  if (!global._mongoClientPromise) {
-    client = new MongoClient(uri, options);
-    global._mongoClientPromise = client.connect();
-  }
-  clientPromise = global._mongoClientPromise;
-} else {
-  // In production, reuse the same client instance across invocations
-  if (!global._mongoClientPromise) {
-    client = new MongoClient(uri, options);
-    global._mongoClientPromise = client.connect();
-  }
-  clientPromise = global._mongoClientPromise;
+function createClientPromise(): Promise<MongoClient> {
+  const newClient = new MongoClient(uri, options);
+  return newClient.connect();
 }
 
 export async function getDb(): Promise<Db> {
+  if (!global._mongoClientPromise) {
+    global._mongoClientPromise = createClientPromise();
+  }
   try {
-    const dbClient = await clientPromise;
+    const dbClient = await global._mongoClientPromise;
     return dbClient.db('storyforge');
   } catch (error) {
     console.error('MongoDB connection error:', error);
-    // Reset the connection promise so next request can retry
     global._mongoClientPromise = undefined;
     throw error;
   }
