@@ -124,7 +124,7 @@ export default function Home() {
             >
               <span className="relative z-10 flex items-center justify-center gap-2 sm:gap-3">
                 <span>✨</span>
-                <span>Begin Your Story</span>
+                <span>Sign Up</span>
                 <span>✨</span>
               </span>
               <div className="absolute inset-0 bg-gradient-to-r from-yellow-500 via-pink-600 to-purple-700 rounded-2xl sm:rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
@@ -136,7 +136,7 @@ export default function Home() {
             >
               <span className="flex items-center justify-center gap-2 sm:gap-3">
                 <span>🔮</span>
-                <span>Enter the Realm</span>
+                <span>Login</span>
                 <span>🔮</span>
               </span>
             </Link>
