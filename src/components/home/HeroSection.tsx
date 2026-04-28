@@ -183,25 +183,18 @@ export default function HeroSection() {
 
         {/* ── Centered Copy ──────────────────────────────── */}
         <div className="relative z-10 text-center px-6 max-w-2xl mx-auto space-y-7 py-20">
-          <div className="flex justify-center">
-            <Badge className="bg-[#A855F7]/10 text-[#ddb7ff] border border-[#A855F7]/25 hover:bg-[#A855F7]/15 transition-colors">
-              <Sparkles className="w-3 h-3 mr-1.5 shrink-0" />
-              AI-Powered Story Engine
-            </Badge>
-          </div>
+
 
           <h1 className="text-5xl lg:text-[3.5rem] xl:text-6xl font-bold leading-[1.1] tracking-tight font-(family-name:--font-space-grotesk)">
-            Build stories{' '}
-            <span className="bg-linear-to-r from-[#A855F7] via-[#EC4899] to-[#3B82F6] bg-clip-text text-transparent">
-              together,
-            </span>
+            Forge stories together,
             <br />
-            one node at a time
+            <span className="bg-linear-to-r from-[#c198e7] to-[#e679af]  bg-clip-text text-transparent">
+              one node at a time
+            </span>
           </h1>
 
-          <p className="text-lg text-[#cfc2d6] leading-relaxed max-w-md mx-auto">
-            Collaborate on branching narratives with an intuitive node-based
-            system. AI-assisted writing meets real-time co-creation.
+          <p className="text-lg text-[#cfc2d6] leading-relaxed max-w-lg mx-auto">
+            Create branching stories with a powerful node-based editor
           </p>
 
           <div className="flex flex-wrap gap-3 justify-center pt-1">
@@ -210,7 +203,7 @@ export default function HeroSection() {
               size="lg"
               className="bg-linear-to-r from-[#A855F7] to-[#EC4899] hover:from-[#9333ea] hover:to-[#db2777] text-white font-semibold px-8 shadow-[0_0_30px_rgba(168,85,247,0.25)] hover:shadow-[0_0_40px_rgba(168,85,247,0.45)] hover:-translate-y-px transition-all duration-200"
             >
-              <Link href="/create-account">Start Writing</Link>
+              <Link href="/create-account">Begin Your Journey</Link>
             </Button>
             <Button
               asChild
@@ -218,7 +211,7 @@ export default function HeroSection() {
               size="lg"
               className="border-[#4d4354] bg-transparent text-[#cfc2d6] hover:bg-white/5 hover:text-white hover:border-[#A855F7]/40 px-8 hover:-translate-y-px transition-all duration-200"
             >
-              <Link href="/dashboard">Explore Demo</Link>
+              <Link href="/dashboard">Forge Your Story</Link>
             </Button>
           </div>
         </div>
