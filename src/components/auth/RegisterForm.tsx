@@ -5,8 +5,11 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Loader2 } from 'lucide-react'
+import { BookOpenText, Eye, EyeOff, Loader2 } from 'lucide-react'
 
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { registerSchema, type RegisterFormData } from '@/lib/validations'
 
 export default function RegisterForm() {
@@ -114,91 +117,90 @@ export default function RegisterForm() {
   }
 
   return (
-    <div className="auth-container">
-      {/* Animated background */}
-      <div className="bg-animation">
-        <div className="floating-node"></div>
-        <div className="floating-node square"></div>
-        <div className="floating-node triangle"></div>
-        <div className="floating-node"></div>
-        <div className="floating-node square"></div>
-        <div className="floating-node"></div>
-        <div className="connection-line line-1"></div>
-        <div className="connection-line line-2"></div>
-        <div className="connection-line line-3"></div>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#09090B] px-4 py-12 text-[#E5E1E4] sm:px-6">
+      <div className="auth-ambient-glow pointer-events-none absolute inset-0">
+        <span className="auth-ambient-wash" aria-hidden="true" />
       </div>
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[#A855F7]/60 to-transparent" />
+      <div className="pointer-events-none absolute -left-24 top-24 h-72 w-72 rounded-full bg-[#A855F7]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -right-28 bottom-16 h-80 w-80 rounded-full bg-[#3B82F6]/10 blur-3xl" />
 
-      {/* Main signup container */}
-      <div className="auth-card">
-        {/* Logo and branding */}
-        <div className="logo-section">
-          <div className="logo">
-            <div className="logo-icon">📖</div>
+      <section className="relative z-10 w-full max-w-lg rounded-2xl border border-white/10 bg-white/[0.07] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45),0_0_38px_rgba(168,85,247,0.16)] backdrop-blur-2xl sm:p-8">
+        <div className="mb-8 text-center">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-[#A855F7] to-[#3B82F6] shadow-[0_0_28px_rgba(168,85,247,0.45)]">
+            <BookOpenText className="h-8 w-8 text-white" aria-hidden="true" />
           </div>
-          <h1 className="brand-name">StoryForge</h1>
-          <p className="brand-tagline">Collaborative storytelling reimagined</p>
-          <p className="auth-subtitle">Join thousands of storytellers worldwide</p>
+          <p className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold text-white">
+            StoryForge
+          </p>
+          <p className="mt-2 text-sm text-[#CFC2D6]">
+            Collaborative storytelling reimagined
+          </p>
+          <p className="mt-1 text-sm text-[#988D9F]">
+            Join thousands of storytellers worldwide
+          </p>
         </div>
 
-        {/* Success/Error messages */}
         {success && (
-          <div className="message success">
+          <div className="mb-5 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-100">
             {success}
           </div>
         )}
         {error && (
-          <div className="message error">
+          <div className="mb-5 rounded-xl border border-red-400/25 bg-red-500/10 px-4 py-3 text-sm text-red-100">
             {error}
           </div>
         )}
 
-        {/* Signup form */}
-        <form className="auth-form" onSubmit={handleSubmit(handleRegister)}>
-          <div className="form-group">
-            <label className="form-label" htmlFor="username">
-              Username <span className="required">*</span>
-            </label>
-            <input
+        <form className="space-y-5" onSubmit={handleSubmit(handleRegister)}>
+          <div className="min-h-[92px] space-y-2">
+            <Label htmlFor="username" className="text-sm font-medium text-[#E5E1E4]">
+              Username <span className="text-[#FFB0CD]">*</span>
+            </Label>
+            <Input
               type="text"
               id="username"
-              className={`form-input ${errors.username ? 'error' : ''}`}
+              aria-invalid={!!errors.username}
+              className="h-12 rounded-xl border-white/10 bg-[#131315]/70 px-4 text-white placeholder:text-white/35 focus-visible:border-[#A855F7] focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_rgba(168,85,247,0.7),0_0_18px_rgba(168,85,247,0.18)]"
               placeholder="storyteller123"
               {...register('username')}
             />
             {errors.username && (
-              <div className="error-message" style={{ display: 'block' }}>
+              <p className="text-xs text-red-200">
                 {errors.username.message}
-              </div>
+              </p>
             )}
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="email">
-              Email Address <span className="required">*</span>
-            </label>
-            <input
+          <div className="min-h-[92px] space-y-2">
+            <Label htmlFor="email" className="text-sm font-medium text-[#E5E1E4]">
+              Email Address <span className="text-[#FFB0CD]">*</span>
+            </Label>
+            <Input
               type="email"
               id="email"
-              className={`form-input ${errors.email ? 'error' : ''}`}
+              aria-invalid={!!errors.email}
+              className="h-12 rounded-xl border-white/10 bg-[#131315]/70 px-4 text-white placeholder:text-white/35 focus-visible:border-[#A855F7] focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_rgba(168,85,247,0.7),0_0_18px_rgba(168,85,247,0.18)]"
               placeholder="john@example.com"
               {...register('email')}
             />
             {errors.email && (
-              <div className="error-message" style={{ display: 'block' }}>
+              <p className="text-xs text-red-200">
                 {errors.email.message}
-              </div>
+              </p>
             )}
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="password">
-              Password <span className="required">*</span>
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
+          <div className="min-h-[92px] space-y-2">
+            <Label htmlFor="password" className="text-sm font-medium text-[#E5E1E4]">
+              Password <span className="text-[#FFB0CD]">*</span>
+            </Label>
+            <div className="relative">
+              <Input
                 type={showPassword ? 'text' : 'password'}
                 id="password"
-                className={`form-input ${errors.password ? 'error' : ''}`}
+                aria-invalid={!!errors.password}
+                className="h-12 rounded-xl border-white/10 bg-[#131315]/70 px-4 pr-12 text-white placeholder:text-white/35 focus-visible:border-[#A855F7] focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_rgba(168,85,247,0.7),0_0_18px_rgba(168,85,247,0.18)]"
                 placeholder="Create a strong password"
                 {...register('password', {
                   onChange: (e: React.ChangeEvent<HTMLInputElement>) => checkPasswordStrength(e.target.value)
@@ -206,107 +208,115 @@ export default function RegisterForm() {
               />
               <button
                 type="button"
-                className="password-toggle"
+                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#CFC2D6] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A855F7]/60"
                 onClick={() => togglePassword('password')}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
-                {showPassword ? '🙈' : '👁️'}
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
             {password && (
-              <div className="password-strength" style={{ display: 'block' }}>
-                <div className="strength-bar">
-                  <div className={`strength-fill ${
-                    passwordStrength.score <= 2 ? 'strength-weak' :
-                    passwordStrength.score <= 4 ? 'strength-fair' :
-                    passwordStrength.score <= 5 ? 'strength-good' : 'strength-strong'
-                  }`}></div>
+              <div className="space-y-2">
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className={`h-full rounded-full transition-all ${
+                      passwordStrength.score <= 2 ? 'w-1/4 bg-red-400' :
+                      passwordStrength.score <= 4 ? 'w-1/2 bg-amber-300' :
+                      passwordStrength.score <= 5 ? 'w-3/4 bg-emerald-300' : 'w-full bg-emerald-400'
+                    }`}
+                  />
                 </div>
-                <div className="strength-text">
+                <p className="text-xs text-[#988D9F]">
                   Password strength: {passwordStrength.text}
-                </div>
+                </p>
               </div>
             )}
             {errors.password && (
-              <div className="error-message" style={{ display: 'block' }}>
+              <p className="text-xs text-red-200">
                 {errors.password.message}
-              </div>
+              </p>
             )}
           </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="confirmPassword">
-              Confirm Password <span className="required">*</span>
-            </label>
-            <div style={{ position: 'relative' }}>
-              <input
+          <div className="min-h-[92px] space-y-2">
+            <Label htmlFor="confirmPassword" className="text-sm font-medium text-[#E5E1E4]">
+              Confirm Password <span className="text-[#FFB0CD]">*</span>
+            </Label>
+            <div className="relative">
+              <Input
                 type={showConfirmPassword ? 'text' : 'password'}
                 id="confirmPassword"
-                className={`form-input ${errors.confirmPassword ? 'error' : ''}`}
+                aria-invalid={!!errors.confirmPassword}
+                className="h-12 rounded-xl border-white/10 bg-[#131315]/70 px-4 pr-12 text-white placeholder:text-white/35 focus-visible:border-[#A855F7] focus-visible:ring-0 focus-visible:shadow-[inset_0_0_0_1px_rgba(168,85,247,0.7),0_0_18px_rgba(168,85,247,0.18)]"
                 placeholder="Confirm your password"
                 {...register('confirmPassword')}
               />
               <button
                 type="button"
-                className="password-toggle"
+                className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg text-[#CFC2D6] transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A855F7]/60"
                 onClick={() => togglePassword('confirmPassword')}
+                aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
               >
-                {showConfirmPassword ? '🙈' : '👁️'}
+                {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
             {errors.confirmPassword && (
-              <div className="error-message" style={{ display: 'block' }}>
+              <p className="text-xs text-red-200">
                 {errors.confirmPassword.message}
-              </div>
+              </p>
             )}
           </div>
 
-          {/* Terms and conditions */}
-          <div className="terms-section">
-            <div className="checkbox-group">
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
               <input
                 type="checkbox"
                 id="terms"
-                className="checkbox"
+                className="mt-1 h-4 w-4 rounded border-white/20 bg-[#131315] accent-[#A855F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A855F7]/60"
                 {...register('terms')}
               />
-              <label htmlFor="terms" className="checkbox-label">
-                I agree to StoryForge&apos;s <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a> <span className="required">*</span>
-              </label>
+              <Label htmlFor="terms" className="block text-sm font-normal leading-6 text-[#CFC2D6]">
+                I agree to StoryForge&apos;s <a href="#" target="_blank" className="font-medium text-[#DDB7FF] hover:text-white">Terms of Service</a> and <a href="#" target="_blank" className="font-medium text-[#DDB7FF] hover:text-white">Privacy Policy</a> <span className="text-[#FFB0CD]">*</span>
+              </Label>
             </div>
             {errors.terms && (
-              <div className="error-message" style={{ display: 'block' }}>
+              <p className="text-xs text-red-200">
                 {errors.terms.message}
-              </div>
+              </p>
             )}
 
-            <div className="checkbox-group">
+            <div className="flex items-start gap-3">
               <input
                 type="checkbox"
                 id="newsletter"
-                className="checkbox"
+                className="mt-1 h-4 w-4 rounded border-white/20 bg-[#131315] accent-[#A855F7] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A855F7]/60"
                 {...register('newsletter')}
               />
-              <label htmlFor="newsletter" className="checkbox-label">
+              <Label htmlFor="newsletter" className="block text-sm font-normal leading-6 text-[#CFC2D6]">
                 I&apos;d like to receive updates about new features and storytelling tips (optional)
-              </label>
+              </Label>
             </div>
           </div>
 
-          <button
+          <Button
             type="submit"
-            className="auth-btn"
+            className="h-12 w-full rounded-xl bg-gradient-to-r from-[#A855F7] to-[#3B82F6] font-semibold text-white shadow-[0_0_24px_rgba(168,85,247,0.35)] transition hover:from-[#B76DFF] hover:to-[#60A5FA] hover:shadow-[0_0_32px_rgba(59,130,246,0.35)]"
             disabled={isLoading}
           >
             {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {isLoading ? 'Creating Account...' : 'Create My StoryForge Account'}
-          </button>
+          </Button>
         </form>
 
-        {/* Login section */}
-        <div className="link-section">
-          <p>Already have an account? <Link href="/login" className="link-section a">Sign in here</Link></p>
+        <div className="mt-8 border-t border-white/10 pt-6 text-center text-sm text-[#CFC2D6]">
+          <p>
+            Already have an account?{' '}
+            <Link href="/login" className="font-semibold text-[#DDB7FF] transition hover:text-white">
+              Sign in here
+            </Link>
+          </p>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
   )
 }
